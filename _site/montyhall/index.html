@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=660b8e067f52bb1ccea4cc238f916fbaaf5f42c8">
+
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <img src="/img/nation.png" style="float: right; width: 20%; margin-right: 1%; margin-bottom: 1%;" border="5"/>
+        <h1>taylanbil.github.io:wq!</h1>
+        <h2>Math, Data, Python, Machine Learning @ Metis</h2>
+
+        <section id="downloads">
+          
+          <a href="http://github.com/taylanbil/taylanbil.github.io" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+          <a href="/" class="btn btn-home"><span></span>Home</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <p><a href="https://en.wikipedia.org/wiki/Monty_Hall_problem">The Monty Hall problem</a> is a famous brain teaser, which often is confusing. The problem statement is;</p>
+
+<blockquote>
+  <p>Suppose you’re on a game show, and you’re given the choice of three doors: Behind one door is a car; behind the others, goats. You pick a door, say No. 1, and the host, who knows what’s behind the doors, opens another door, say No. 3, which has a goat. He then says to you, “Do you want to pick door No. 2?” Is it to your advantage to switch your choice?</p>
+</blockquote>
+
+<p>At first it seems like since there are only two doors left, it would not matter to switch your pick or not. However, careful reasoning using probability implies it is better to switch your decision at that point.</p>
+
+<hr />
+
+<p>In this post, I would like to establish this advantage using a simulation. To that end, here’s the pseudocode of 1 game:</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="k">def</span> <span class="nf">montyhallgame</span><span class="p">(</span><span class="n">switch</span><span class="p">):</span>
+    <span class="n">determine</span> <span class="n">where</span> <span class="n">the</span> <span class="n">car</span> <span class="ow">is</span>
+    <span class="n">guest</span> <span class="n">picks</span> <span class="n">a</span> <span class="n">door</span>
+    <span class="n">host</span> <span class="n">eliminates</span> <span class="n">a</span> <span class="n">door</span> <span class="n">which</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">picked</span> <span class="ow">and</span> <span class="n">which</span> <span class="n">has</span> <span class="n">a</span> <span class="n">goat</span>
+    <span class="k">if</span> <span class="n">switch</span><span class="p">:</span>
+        <span class="n">switch</span> <span class="n">choice</span>
+    <span class="k">return</span> <span class="n">success</span><span class="o">/</span><span class="n">failure</span>
+
+</code></pre>
+</div>
+
+<p>Once we have this in working code, we can then make the computer play a million games and look at the probability of success if we switch vs if we don’t switch.</p>
+
+<p>First things first, let’s translate this pseudocode above into python:</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">random</span>
+
+<span class="k">def</span> <span class="nf">montyhallgame</span><span class="p">(</span><span class="n">switch</span><span class="p">):</span>
+    <span class="c"># pick a random index and make that a car</span>
+    <span class="n">doors</span> <span class="o">=</span> <span class="p">[</span><span class="s">'goat'</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">)]</span>
+    <span class="n">car</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">doors</span><span class="p">)))</span>  
+    <span class="n">doors</span><span class="p">[</span><span class="n">car</span><span class="p">]</span> <span class="o">=</span> <span class="s">'car'</span>
+    <span class="c"># Now the guest makes their pick</span>
+    <span class="n">guest_pick</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">doors</span><span class="p">)))</span>
+    <span class="c"># Now the host...</span>
+    <span class="n">host_remove_index</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">doors</span><span class="p">))</span> <span class="k">if</span> <span class="n">i</span> <span class="o">!=</span> <span class="n">guest_pick</span> <span class="ow">and</span> <span class="n">doors</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="s">'goat'</span><span class="p">]</span>
+    <span class="p">)</span>  <span class="c"># this index points to the door that the host decides to keep in</span>
+    <span class="n">host_keep_index</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">!=</span> <span class="n">guest_pick</span> <span class="ow">and</span> <span class="n">i</span> <span class="o">!=</span> <span class="n">host_remove_index</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">switch</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">doors</span><span class="p">[</span><span class="n">host_keep_index</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">doors</span><span class="p">[</span><span class="n">guest_pick</span><span class="p">]</span>
+    
+<span class="k">print</span><span class="p">(</span><span class="n">montyhallgame</span><span class="p">(</span><span class="bp">False</span><span class="p">))</span>
+<span class="k">print</span><span class="p">(</span><span class="n">montyhallgame</span><span class="p">(</span><span class="bp">True</span><span class="p">))</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>car
+car
+</code></pre>
+</div>
+
+<p>Allright, now we have a function which tells us what the result of the game is.</p>
+
+<p>Let’s play this game a million times with and without switching and see how many goats/cars do we get.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">N_TRIALS</span> <span class="o">=</span> <span class="mi">10</span><span class="o">**</span><span class="mi">6</span>
+<span class="n">switch_car_count</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">noswitch_car_count</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_TRIALS</span><span class="p">):</span>
+    <span class="n">switch_car_count</span> <span class="o">+=</span> <span class="n">montyhallgame</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span> <span class="o">==</span> <span class="s">'car'</span>
+    <span class="n">noswitch_car_count</span> <span class="o">+=</span> <span class="n">montyhallgame</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span> <span class="o">==</span> <span class="s">'car'</span>
+
+<span class="k">print</span><span class="p">(</span><span class="s">'if we switch, out of {} games, we get {} wins'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+    <span class="n">N_TRIALS</span><span class="p">,</span> <span class="n">switch_car_count</span><span class="p">))</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'if we don</span><span class="se">\'</span><span class="s">t switch, out of {} games, we get {} wins'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+    <span class="n">N_TRIALS</span><span class="p">,</span> <span class="n">noswitch_car_count</span><span class="p">))</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>if we switch, out of 1000000 games, we get 666999 wins
+if we don't switch, out of 1000000 games, we get 333350 wins
+</code></pre>
+</div>
+
+<p>Look at that difference! Switching the decision doubles the guest’s win rate! This confirms the theoretical calculation.</p>
+
+<hr />
+
+<p>Let’s make the difference even more striking. Let’s modify the above code so that there aren’t just 3 doors, but 100 doors, with 99 goats and 1 car. And once the guest picks, the host comes in and removes 98 doors, all with goats behind.</p>
+
+<p>We’ll write the function a bit more efficiently, encoding car by 1 and goat by 0.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="k">def</span> <span class="nf">montyhallgame2</span><span class="p">(</span><span class="n">switch</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="n">car</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+    <span class="n">guest_pick</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">guest_pick</span> <span class="o">!=</span> <span class="n">car</span><span class="p">:</span>
+        <span class="n">host_keep</span> <span class="o">=</span> <span class="n">car</span>  <span class="c"># in this case, we can't eliminate the car</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c"># this is our way of deleting the guest_pick from host's options to remove</span>
+        <span class="n">host_keep</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> 
+        <span class="n">host_keep</span> <span class="o">=</span> <span class="n">host_keep</span> <span class="o">+</span> <span class="p">(</span><span class="n">host_keep</span> <span class="o">&gt;=</span> <span class="n">guest_pick</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">host_keep</span> <span class="k">if</span> <span class="n">switch</span> <span class="k">else</span> <span class="n">guest_pick</span>
+    <span class="k">return</span> <span class="n">result</span> <span class="o">==</span> <span class="n">car</span>
+</code></pre>
+</div>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">N_TRIALS</span> <span class="o">=</span> <span class="mi">10</span><span class="o">**</span><span class="mi">6</span>
+<span class="n">switch_car_count</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">noswitch_car_count</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_TRIALS</span><span class="p">):</span>
+    <span class="n">switch_car_count</span> <span class="o">+=</span> <span class="n">montyhallgame2</span><span class="p">(</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">noswitch_car_count</span> <span class="o">+=</span> <span class="n">montyhallgame2</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+
+<span class="k">print</span><span class="p">(</span><span class="s">'if we switch, out of {} games, we get {} wins'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+    <span class="n">N_TRIALS</span><span class="p">,</span> <span class="n">switch_car_count</span><span class="p">))</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'if we don</span><span class="se">\'</span><span class="s">t switch, out of {} games, we get {} wins'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+    <span class="n">N_TRIALS</span><span class="p">,</span> <span class="n">noswitch_car_count</span><span class="p">))</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>if we switch, out of 1000000 games, we get 990081 wins
+if we don't switch, out of 1000000 games, we get 9973 wins
+</code></pre>
+</div>
+
+<p>Now that is quite a big difference! In the end, it amounts to the following probabilities:</p>
+
+<blockquote>
+  <p>P(win without switch) = P(guessing right the first time)</p>
+</blockquote>
+
+<blockquote>
+  <p>P(win with switch) = P(guessing wrong the first time)</p>
+</blockquote>
+
+      </section>
+    </div>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+        ga('create', 'UA-106417291-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>
