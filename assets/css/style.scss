@@ -1,0 +1,15 @@
+---
+---
+
+@import "{{ site.theme }}";
+div.highlighter-rouge pre { 
+    background-color: #151515; 
+    color: #2ECC40;
+}
+div.language-python pre { 
+    border-left-color: #FFDC00;
+    border-left-style: solid;
+    border-left-width: 1px;
+    color: #d0d0d0;
+    background: #000000; 
+}

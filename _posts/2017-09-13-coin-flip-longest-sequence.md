@@ -1,5 +1,5 @@
 ---
-title: Longest subsequence in a sequence of coin flips
+title: Longest subsequence of heads
 date: 2017-09-12 16:29:00
 categories: montecarlo
 permalink: /explencoinflip/
@@ -93,4 +93,6 @@ print(s/N_TRIALS)
     7.302284
 
 
-Great! So we can expect to have around 7.3 subsequent 1s if we flipped the coin 250 times. It is important to keep in mind that this result is an approximation to the true value. If we wanted to get even closer, we might want to increase the number of trials.
+Great! So we can expect to have around 7.3 subsequent 1s if we flipped the coin 250 times. It is important to keep in mind that this result is an approximation to the true value. If we wanted to get even closer, we might want to increase the number of trials.  
+
+This code can be modified to get other insight into the process of flipping coins, such as, what is the histogram / distribution of length of longest sequence is like? What is the 50 percentile of lengths? How does the longest length of subsequence change with the number of coin flips per game? etc.

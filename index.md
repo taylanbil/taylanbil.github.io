@@ -1,6 +1,5 @@
 ---
 layout: taylandefault
-permalink: /
 ---
 
 <ul>
