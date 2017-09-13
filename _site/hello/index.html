@@ -1,37 +1,49 @@
----
-title: Hello Worlds
-date: 2017-09-12 16:29:00
-categories: test
-permalink: /hello/
----
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=6dd7236760fd8f64d35d333994cbf433e95b39c5">
+    <title>taylanbil.github.io by taylanbil</title>
+  </head>
 
-hello world  
+  <body>
 
-```python
-def bla(x):
-    print(x)
-    return x**2
-```
+    <header>
+      <div class="container">
+        <h1>taylanbil.github.io</h1>
+        <h2></h2>
 
-![myface](/img/nation.png)
+        <section id="downloads">
+          
+          <a href="http://github.com/taylanbil/taylanbil.github.io" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
 
+    <div class="container">
+      <section id="main_content">
+        <p>hello world</p>
 
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="k">def</span> <span class="nf">bla</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span>
+</code></pre>
+</div>
 
-```python
-import pandas as pd
-import numpy as np
+<p><img src="/img/nation.png" alt="myface" /></p>
 
-X = np.random.randint(0, 10, (100, 3))
-X = pd.DataFrame(X)
-```
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
 
+<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+</code></pre>
+</div>
 
-```python
-pd.pivot_table(X, index=[0], columns=[2], values=[1], aggfunc=np.sum)
-```
-
-
-
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">pd</span><span class="o">.</span><span class="n">pivot_table</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">values</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">aggfunc</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="nb">sum</span><span class="p">)</span>
+</code></pre>
+</div>
 
 <div>
 <style>
@@ -215,15 +227,9 @@ pd.pivot_table(X, index=[0], columns=[2], values=[1], aggfunc=np.sum)
 </table>
 </div>
 
-
-
-
-```python
-X.groupby([0, 2])[1].agg(np.sum).unstack()
-```
-
-
-
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">X</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">])[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="nb">sum</span><span class="p">)</span><span class="o">.</span><span class="n">unstack</span><span class="p">()</span>
+</code></pre>
+</div>
 
 <div>
 <style>
@@ -403,9 +409,13 @@ X.groupby([0, 2])[1].agg(np.sum).unstack()
 </table>
 </div>
 
+<div class="language-python highlighter-rouge"><pre class="highlight"><code>
+</code></pre>
+</div>
 
+      </section>
+    </div>
 
-
-```python
-
-```
+    
+  </body>
+</html>
