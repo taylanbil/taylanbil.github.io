@@ -1,5 +1,6 @@
 ---
 layout: taylandefault
+permalink: /
 ---
 
 <img src="/img/nation.png" width="200" height="200" border="10"/>
