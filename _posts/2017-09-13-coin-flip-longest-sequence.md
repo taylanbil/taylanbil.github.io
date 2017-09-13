@@ -1,7 +1,7 @@
 ---
 title: Longest subsequence of heads
-date: 2017-09-12 16:29:00
-categories: montecarlo
+date: 2017-09-13 15:53:00
+categories: test
 permalink: /explencoinflip/
 layout: taylandefault
 published: true
@@ -35,7 +35,7 @@ game(10)
 
 
 
-    array([0, 1, 1, 0, 0, 1, 1, 0, 1, 0])
+    array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
 
 
 
@@ -65,16 +65,16 @@ for i in range(4):
 ```
 
     attempt 0
-    [1 0 0 0 0 1 1 1 0 0] longest sequence of 1s =  3
+    [1 1 0 1 0 0 1 1 0 0] longest sequence of 1s =  2
     ----------------------------------------
     attempt 1
-    [0 1 0 1 0 1 0 1 1 0] longest sequence of 1s =  2
+    [1 1 1 1 1 0 0 0 1 0] longest sequence of 1s =  5
     ----------------------------------------
     attempt 2
-    [1 0 0 1 0 0 1 0 0 0] longest sequence of 1s =  1
+    [1 1 1 1 1 0 1 1 0 1] longest sequence of 1s =  5
     ----------------------------------------
     attempt 3
-    [0 1 0 1 0 1 1 1 0 0] longest sequence of 1s =  3
+    [0 1 0 1 0 1 1 1 1 0] longest sequence of 1s =  4
     ----------------------------------------
 
 
@@ -82,17 +82,44 @@ It looks good. Now, to get the (approximate) expected value that the question as
 
 
 ```python
-N_TRIALS = 10**6  # a million times
+N_TRIALS = 10**6 
 s = 0
 for _ in range(N_TRIALS):
     seq = game()
     s += longest_seq(seq)
-print(s/N_TRIALS)
+    
+s/N_TRIALS
 ```
 
-    7.302284
 
 
-Great! So we can expect to have around 7.3 subsequent 1s if we flipped the coin 250 times. It is important to keep in mind that this result is an approximation to the true value. If we wanted to get even closer, we might want to increase the number of trials.  
+
+    7.305981
+
+
+
+Great! So we can expect to have around 7.3 subsequent 1s if we flipped the coin 250 times. It is important to keep in mind that this result is an approximation to the true value. If we wanted to get even closer, we might want to increase the number of trials.
+
+---
 
 This code can be modified to get other insight into the process of flipping coins, such as, what is the histogram / distribution of length of longest sequence is like? What is the 50 percentile of lengths? How does the longest length of subsequence change with the number of coin flips per game? etc.
+
+Below, we plot the kernel density estimation (think of it like a fancy histogram) for the longest subsequence lengths.
+
+
+```python
+N_TRIALS = 10**3
+s = []
+for _ in range(N_TRIALS):
+    seq = game()
+    s.append(longest_seq(seq))
+    
+
+import pandas as pd
+%matplotlib inline
+
+
+pd.Series(s).plot.kde(title='Kernel Density of longest subsequence lengths');
+```
+
+![png](/img/coinfliplongestseq_11_1.png)
