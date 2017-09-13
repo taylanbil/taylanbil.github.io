@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=6dd7236760fd8f64d35d333994cbf433e95b39c5">
+
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <img src="/img/nation.png" style="float: right; width: 20%; margin-right: 1%; margin-bottom: 1%;" border="5"/>
+        <h1>taylanbil.github.io:wq!</h1>
+        <h2></h2>
+
+        <section id="downloads">
+          
+          <a href="http://github.com/taylanbil/taylanbil.github.io" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1 id="problem">Problem:</h1>
+
+<p>If we flipped a fair coin 250 times, what is the expected length of the longest sequence of heads?</p>
+
+<hr />
+
+<p>Although this problem can be solved analytically, that’s not the goal of this post. Problems like this are perfect use cases of Monte Carlo simulations. We won’t get to an exact solution this way, however, we can get to a close approximation very fast. That is more often than not a good trade to make.</p>
+
+<p>Let’s start by writing a <code class="highlighter-rouge">python</code> function which generates 250 random numbers, between 0 and 1, with equal probability. Here, 1 encodes <code class="highlighter-rouge">heads</code> and 0 encodes <code class="highlighter-rouge">tails</code>.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="k">def</span> <span class="nf">game</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">250</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>This function takes in a <code class="highlighter-rouge">keyword argument</code>, <code class="highlighter-rouge">n</code>, whose default value is 250. We can use it with any other number as well. Let’s test it out, with, say, ten flips.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">game</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>array([0, 1, 1, 0, 0, 1, 1, 0, 1, 0])
+</code></pre>
+</div>
+
+<p>Looks like this works. Now, given a sequence of 0s and 1s such as this one above, we need to find how long the <strong>longest sequence of 1s</strong> is. Let’s do that by writing another function.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="k">def</span> <span class="nf">longest_seq</span><span class="p">(</span><span class="n">input_sequence</span><span class="p">):</span>
+    <span class="n">s_max</span><span class="p">,</span> <span class="n">s</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">input_sequence</span><span class="p">:</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">s</span><span class="o">+</span><span class="mi">1</span> <span class="k">if</span> <span class="n">i</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">s_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">s_max</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">s_max</span>
+</code></pre>
+</div>
+
+<p>Let’s do a sanity check;</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="c"># Sanity check</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">'attempt </span><span class="si">%</span><span class="s">s'</span> <span class="o">%</span> <span class="n">i</span><span class="p">)</span>
+    <span class="n">seq</span> <span class="o">=</span> <span class="n">game</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">seq</span><span class="p">,</span> <span class="s">'longest sequence of 1s = '</span><span class="p">,</span> <span class="n">longest_seq</span><span class="p">(</span><span class="n">seq</span><span class="p">))</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">40</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>attempt 0
+[1 0 0 0 0 1 1 1 0 0] longest sequence of 1s =  3
+----------------------------------------
+attempt 1
+[0 1 0 1 0 1 0 1 1 0] longest sequence of 1s =  2
+----------------------------------------
+attempt 2
+[1 0 0 1 0 0 1 0 0 0] longest sequence of 1s =  1
+----------------------------------------
+attempt 3
+[0 1 0 1 0 1 1 1 0 0] longest sequence of 1s =  3
+----------------------------------------
+</code></pre>
+</div>
+
+<p>It looks good. Now, to get the (approximate) expected value that the question asks, let’s do this <strong>a lot of times</strong> and get the average of the length of the longest subsequences.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">N_TRIALS</span> <span class="o">=</span> <span class="mi">10</span><span class="o">**</span><span class="mi">6</span>  <span class="c"># a million times</span>
+<span class="n">s</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_TRIALS</span><span class="p">):</span>
+    <span class="n">seq</span> <span class="o">=</span> <span class="n">game</span><span class="p">()</span>
+    <span class="n">s</span> <span class="o">+=</span> <span class="n">longest_seq</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">s</span><span class="o">/</span><span class="n">N_TRIALS</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>7.302284
+</code></pre>
+</div>
+
+<p>Great! So we can expect to have around 7.3 subsequent 1s if we flipped the coin 250 times. It is important to keep in mind that this result is an approximation to the true value. If we wanted to get even closer, we might want to increase the number of trials.</p>
+
+      </section>
+    </div>
+
+    
+  </body>
+</html>
