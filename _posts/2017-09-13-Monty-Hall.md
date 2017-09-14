@@ -1,7 +1,7 @@
 ---
-title: Longest subsequence of heads
-date: 2017-09-13 15:53:00
-categories:  a
+title: Monty Hall
+date: 2017-09-13 17:20:00
+categories: montecarlo
 permalink: /montyhall/
 layout: taylandefault
 published: true
