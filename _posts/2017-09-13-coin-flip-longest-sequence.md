@@ -1,7 +1,7 @@
 ---
 title: Longest subsequence of heads
 date: 2017-09-13 15:53:00
-categories: test
+categories: montecarlo
 permalink: /explencoinflip/
 layout: taylandefault
 published: true

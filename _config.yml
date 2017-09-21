@@ -3,3 +3,4 @@ description: Math, Data, Python, Machine Learning @ Metis
 show_downloads: false
 google_analytics: UA-106417291-1
 theme: jekyll-theme-hacker
+exclude: ["makepost.sh", "README.md", "nbs"]
