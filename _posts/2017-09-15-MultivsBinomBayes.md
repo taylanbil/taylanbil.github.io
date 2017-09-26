@@ -187,7 +187,7 @@ Thus, we end up computing the following conditional probabilities (likelihoods).
  So far it is the same, but it differs in below:
  
  * P(<span style="color:orange">**a document has x1 in it**</span> \| document is 1) = 1/2  
-&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:blue">___Although there are 3 documents labeled 1, there are 2 words in doc1, and only 1 of them is x1___</span>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:red">___Although there are 3 documents labeled 1, there are 2 words in doc1, and only 1 of them is x1___</span>
  * P(<span style="color:orange">**a document has x2 in it**</span> \| document is 1) = 1/2  
 &nbsp;&nbsp;&nbsp;&nbsp;_Same._
  * P(document is 0) = 3/5  

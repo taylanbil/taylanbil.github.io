@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=14fb01960fc3e94c5da715752e354da927ff3349">
+
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <img src="/img/nation.png" style="float: right; width: 20%; margin-right: 1%; margin-bottom: 1%;" border="5"/>
+        <h1>taylanbil.github.io:wq!</h1>
+        <h2>Math, Data, Python, Machine Learning @ Metis</h2>
+
+        <section id="downloads">
+          
+          <a href="http://github.com/taylanbil/taylanbil.github.io" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+          <a href="/" class="btn btn-home"><span></span>Home</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1 id="sklearn-like-api-for-a-general-implementation-of-naive-bayes">sklearn-like api for a general implementation of Naive Bayes</h1>
+
+<h2 id="0-intro">0. Intro:</h2>
+
+<p>Although the computations that go into it are very tedious Naive Bayes is one of the more accessible ML classification algorithms out there. The reason for that is it is easy to understand, and it makes <strong>sense</strong>, intuitively speaking.</p>
+
+<p>However, the <code class="highlighter-rouge">sklearn</code> implementations of Naive Bayes are built (excluding <code class="highlighter-rouge">GaussianNB</code>) with certain assumptions, which make them tough to use without a lot of pre-processing, as we explored in <a href="/multinbvsbinomnb/">this post</a>. This time, I’d like to implement the Naive Bayes algorithm idea for a general input dataset. I will not optimize the code, so it won’t be naturally scalable or anything, the goal is just to hack something together quickly.</p>
+
+<hr />
+
+<h2 id="1-refresher-on-naive-bayes">1. Refresher on Naive Bayes</h2>
+
+<p>Let’s start with revisiting the algorithm. In the following dataset, there are 4 columns to predict whether someone will play tennis on that day. Let’s take a quick look at this small dataset:</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">division</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+
+<span class="c"># A really simple dataset to demonstrate the algorithm</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+    <span class="s">'https://raw.githubusercontent.com/petehunt/c4.5-compiler/master/example/tennis.csv'</span><span class="p">,</span>
+    <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s">'outlook'</span><span class="p">,</span> <span class="s">'temp'</span><span class="p">,</span> <span class="s">'humidity'</span><span class="p">,</span> <span class="s">'wind'</span><span class="p">,</span> <span class="s">'play'</span><span class="p">]</span>
+<span class="p">)</span>
+
+<span class="n">data</span>
+</code></pre>
+</div>
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>outlook</th>
+      <th>temp</th>
+      <th>humidity</th>
+      <th>wind</th>
+      <th>play</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>Sunny</td>
+      <td>Hot</td>
+      <td>High</td>
+      <td>Weak</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>Sunny</td>
+      <td>Hot</td>
+      <td>High</td>
+      <td>Strong</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>Overcast</td>
+      <td>Hot</td>
+      <td>High</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>Rain</td>
+      <td>Mild</td>
+      <td>High</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>Rain</td>
+      <td>Cool</td>
+      <td>Normal</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>Rain</td>
+      <td>Cool</td>
+      <td>Normal</td>
+      <td>Strong</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>Overcast</td>
+      <td>Cool</td>
+      <td>Normal</td>
+      <td>Strong</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>Sunny</td>
+      <td>Mild</td>
+      <td>High</td>
+      <td>Weak</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>Sunny</td>
+      <td>Cool</td>
+      <td>Normal</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>Rain</td>
+      <td>Mild</td>
+      <td>Normal</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>Sunny</td>
+      <td>Mild</td>
+      <td>Normal</td>
+      <td>Strong</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>Overcast</td>
+      <td>Mild</td>
+      <td>High</td>
+      <td>Strong</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>Overcast</td>
+      <td>Hot</td>
+      <td>Normal</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>Rain</td>
+      <td>Mild</td>
+      <td>High</td>
+      <td>Strong</td>
+      <td>No</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Given this dataset, we can use Bayesian thinking to predict whether or not someone will play tennis on a new day, given the weather. Specifically, Naive Bayes proceeds as follows:</p>
+
+<p>Let’s say, on day <strong>14</strong>, the weather is</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>outlook</th>
+      <th>temp</th>
+      <th>humidity</th>
+      <th>wind</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Overcast</td>
+      <td>Mild</td>
+      <td>Normal</td>
+      <td>Weak</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>We want to compute the following probabilities:</p>
+
+<script type="math/tex; mode=display">P(yes \,|\,  overcast, mild, normal, weak)</script>
+
+<script type="math/tex; mode=display">P(no \,|\, overcast, mild, normal, weak)</script>
+
+<p>Instead of computing these exactly, we compute proxies of these. Since this part is supposed to be a refresher only, I’ll only include the computation of the first case. It goes like this:</p>
+
+<script type="math/tex; mode=display">P(yes \,|\, o, m, n, w) \approx P(o | y)\times P(m|y) \times P(n|y) \times P(w|y) \times P(y)</script>
+
+<p>And the terms on the right side of the equation can be derived from looking at the dataset and counting. For example,</p>
+
+<script type="math/tex; mode=display">P(mild \,|\, yes)</script>
+
+<p>is just the count of total days with <strong>play</strong> = <em>yes</em> and <strong>temperature</strong> = <em>mild</em>, divided by the days with <strong>play</strong> = <em>yes</em>. Let’s compute;</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">mild</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">temp</span> <span class="o">==</span> <span class="s">'Mild'</span>
+<span class="n">yes</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">play</span> <span class="o">==</span> <span class="s">'Yes'</span>
+
+<span class="k">print</span><span class="p">(</span><span class="s">'P(mild | yes) = {}/{}'</span><span class="o">.</span><span class="n">format</span><span class="p">((</span><span class="n">mild</span><span class="o">&amp;</span><span class="n">yes</span><span class="p">)</span><span class="o">.</span><span class="nb">sum</span><span class="p">(),</span> <span class="n">yes</span><span class="o">.</span><span class="nb">sum</span><span class="p">()))</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>P(mild | yes) = 4/9
+</code></pre>
+</div>
+
+<p>The final term in the formula above is $P(y)$. That’s even simpler to compute, since it is just the count of lines with <em>yes</em> divided by the total number of lines.</p>
+
+<p>Let’s put the pieces together by computing proxies for both probabilities with code. We get;</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">yes</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">play</span> <span class="o">==</span> <span class="s">'Yes'</span>
+
+<span class="n">o</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">outlook</span> <span class="o">==</span> <span class="s">'Overcast'</span>
+<span class="n">m</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">temp</span> <span class="o">==</span> <span class="s">'Mild'</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">humidity</span> <span class="o">==</span> <span class="s">'Normal'</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">wind</span> <span class="o">==</span> <span class="s">'Weak'</span>
+
+<span class="n">ans</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s">'yes'</span><span class="p">:</span> <span class="n">yes</span><span class="o">.</span><span class="nb">sum</span><span class="p">(),</span>
+    <span class="s">'no'</span><span class="p">:</span> <span class="p">(</span><span class="o">~</span><span class="n">yes</span><span class="p">)</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span>
+<span class="p">}</span>
+<span class="k">for</span> <span class="n">elt</span> <span class="ow">in</span> <span class="p">[</span><span class="n">o</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">w</span><span class="p">]:</span>
+    <span class="n">ans</span><span class="p">[</span><span class="s">'yes'</span><span class="p">]</span> <span class="o">*=</span> <span class="p">(</span><span class="n">yes</span> <span class="o">&amp;</span> <span class="n">elt</span><span class="p">)</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">yes</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span>
+    <span class="n">ans</span><span class="p">[</span><span class="s">'no'</span><span class="p">]</span> <span class="o">*=</span> <span class="p">((</span><span class="o">~</span><span class="n">yes</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">elt</span><span class="p">)</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span> <span class="o">/</span> <span class="p">(</span><span class="o">~</span><span class="n">yes</span><span class="p">)</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span>
+
+<span class="k">print</span><span class="p">(</span><span class="s">'P(yes | o, m, n, w) approximately is {}'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ans</span><span class="p">[</span><span class="s">'yes'</span><span class="p">]))</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'P(no | o, m, n, w) approximately is {}'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ans</span><span class="p">[</span><span class="s">'no'</span><span class="p">]))</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>P(yes | o, m, n, w) approximately is 0.79012345679
+P(no | o, m, n, w) approximately is 0.0
+</code></pre>
+</div>
+
+<p>Before we end this section, notice that the algorithm thinks there’s 0 chance that the person does not play tennis under these circumstances. Not only that’s a strong opinion, but also it results in numerical difficulties in a real world implementation. To remedy this, one uses Laplace smoothing.</p>
+
+<hr />
+
+<h2 id="2-implementation">2. Implementation</h2>
+
+<h3 id="2a-preprocessing">2.a Preprocessing</h3>
+
+<p>You may have noticed that in our toy dataset, every attribute was categorical. There were no continuous numerical, nor ordinal fields. Also, unlike <code class="highlighter-rouge">sklearn</code>’s NB algorithms, we did not make any assumptions about the incoming training dataset. Columns were (thought to be) pairwise independent.</p>
+
+<p>As a design choice, we will present a version of Naive Bayes that works with such a training set. Every column will be categorical, and we will implement the computations we carried out above. In practice though, not every training data will consist ofcategorical columns only. To that end, let’s first code a <code class="highlighter-rouge">Discretizer</code> object. The <code class="highlighter-rouge">Discretizer</code> will do the following:</p>
+
+<ol>
+  <li>Takes in a continuous <code class="highlighter-rouge">pandas</code> series and bins the values.</li>
+  <li>Remembers the cutoffs so that it can apply the same transformations later to find which bin the new value belongs to.</li>
+</ol>
+
+<p>Feel free to skip over the code for the usage.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">itemgetter</span>
+<span class="kn">from</span> <span class="nn">bisect</span> <span class="kn">import</span> <span class="n">bisect_right</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+
+<span class="k">class</span> <span class="nc">Discretizer</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">upperlim</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">bottomlim</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span> <span class="o">=</span> <span class="n">mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_lims</span><span class="p">(</span><span class="n">upperlim</span><span class="p">,</span> <span class="n">bottomlim</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">cutoffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">set_lims</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">upperlim</span><span class="p">,</span> <span class="n">bottomlim</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span> <span class="o">=</span> <span class="n">bottomlim</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span> <span class="o">=</span> <span class="n">upperlim</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">)))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span>
+
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">continuous_series</span><span class="p">,</span> <span class="n">subsample</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">subsample</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">*</span><span class="n">subsample</span> <span class="k">if</span> <span class="n">subsample</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">subsample</span>
+            <span class="n">continuous_series</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="n">continuous_series</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="n">pct</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">'average'</span><span class="p">)</span>
+        <span class="n">ranked</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span>
+        <span class="n">ranked</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="n">ranked</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="nb">round</span><span class="p">)</span>
+        <span class="n">nvals</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">ranked</span><span class="p">))</span>  <span class="c"># sorted in case numpy changes</span>
+        <span class="k">for</span> <span class="n">nval</span> <span class="ow">in</span> <span class="n">nvals</span><span class="p">:</span>
+            <span class="n">cond</span> <span class="o">=</span> <span class="n">ranked</span> <span class="o">==</span> <span class="n">nval</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">continuous_series</span><span class="p">[</span><span class="n">cond</span><span class="p">]</span><span class="o">.</span><span class="nb">min</span><span class="p">(),</span> <span class="nb">int</span><span class="p">(</span><span class="n">nval</span><span class="p">)))</span>
+
+    <span class="k">def</span> <span class="nf">transform_single</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">NotImplementedError</span><span class="p">(</span><span class="s">'Haven</span><span class="se">\'</span><span class="s">t been fitted yet'</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="n">bisect_right</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cutoffs</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform_single</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">vals</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transform_single</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>The api is similar to <code class="highlighter-rouge">sklearn</code>, with <code class="highlighter-rouge">fit</code>, <code class="highlighter-rouge">transform</code> and <code class="highlighter-rouge">fit_transform</code> methods. Let’s see the usage on a simple example. You can check if the values of y are binned correctly by looking at the cutoffs.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">D</span> <span class="o">=</span> <span class="n">Discretizer</span><span class="p">(</span><span class="n">upperlim</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+<span class="n">D</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'cutoffs:'</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">D</span><span class="o">.</span><span class="n">cutoffs</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">30</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'values:'</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">y</span><span class="p">[:</span><span class="mi">4</span><span class="p">])</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">30</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'bins:'</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">D</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">y</span><span class="p">[:</span><span class="mi">4</span><span class="p">]))</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>cutoffs:
+[0.10316905194019832, 0.28798638771620189, 0.48254030703944994, 0.69792871673000578, 0.89006354032939106]
+------------------------------
+values:
+[ 0.50908875  0.00113411  0.73404021  0.3087637 ]
+------------------------------
+bins:
+0    3
+1    0
+2    4
+3    2
+dtype: int64
+</code></pre>
+</div>
+
+<p>Now comes the part where we apply the <code class="highlighter-rouge">Discretizer</code> object to the whole dataset. To that end, we will define a <code class="highlighter-rouge">NaiveBayesPreprocessor</code> object. If a field is discrete (i.e. categorical), it will leave it (mostly) untouched (in reality, it will eliminate the values that does not occur more than 1% of the time). If the field is continuous, it will bin it as above.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="k">class</span> <span class="nc">NaiveBayesPreprocessor</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="s">"""
+    Don't pass in Nans. fill with keyword.
+    """</span>
+
+    <span class="n">OTHER</span> <span class="o">=</span> <span class="s">'____OTHER____'</span>
+    <span class="n">FILLNA</span> <span class="o">=</span> <span class="s">'____NA____'</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">min_freq</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha</span>  <span class="c"># Laplace smoothing</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_freq</span> <span class="o">=</span> <span class="n">min_freq</span>  <span class="c"># drop values occuring less frequently than this</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bins</span> <span class="o">=</span> <span class="n">bins</span>  <span class="c"># number of bins for continuous fields</span>
+
+    <span class="k">def</span> <span class="nf">learn_continuous_transf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">Discretizer</span><span class="p">(</span><span class="n">upperlim</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bins</span><span class="p">)</span>
+        <span class="n">D</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">D</span>
+
+    <span class="k">def</span> <span class="nf">learn_discrete_transf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
+        <span class="n">vcs</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">dropna</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="n">vcs</span> <span class="o">=</span> <span class="n">vcs</span><span class="p">[</span><span class="n">vcs</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_freq</span><span class="p">]</span>
+        <span class="n">keep</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">vcs</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">keep</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">vcs</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">transf</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">keep</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">OTHER</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mask</span> <span class="o">=</span> <span class="p">{</span><span class="n">fld</span> <span class="k">for</span> <span class="n">fld</span> <span class="ow">in</span> <span class="n">vcs</span><span class="o">.</span><span class="n">index</span> <span class="k">if</span> <span class="n">fld</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">keep</span><span class="p">}</span>
+            <span class="n">transf</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">OTHER</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">mask</span> <span class="k">else</span> <span class="n">r</span>
+        <span class="k">return</span> <span class="n">transf</span>
+
+    <span class="k">def</span> <span class="nf">learn_transf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">series</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learn_continuous_transf</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learn_discrete_transf</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X_orig</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="s">"""
+        Expects pandas series and pandas DataFrame
+        """</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">X_orig</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">FILLNA</span><span class="p">)</span>
+        <span class="c"># get dtypes</span>
+        <span class="c"># self.dtypes = defaultdict(set)</span>
+        <span class="c"># for fld, dtype in X.dtypes.iteritems():</span>
+        <span class="c">#     self.dtypes[dtype].add(fld)</span>
+        <span class="c"># get transfs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transformations</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">fld</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">learn_transf</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">series</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()}</span>
+
+    <span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X_orig</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="s">"""
+        Expects pandas series and pandas DataFrame
+        """</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">X_orig</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">FILLNA</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">func</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">transformations</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">Discretizer</span><span class="p">):</span>
+                <span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">X</span>
+
+    <span class="k">def</span> <span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>We will see the preprocessor in action. Before that though, now is the time to code up the <code class="highlighter-rouge">NaiveBayesClassifier</code>.</p>
+
+<h3 id="2b-naivebayesclassifier">2.b NaiveBayesClassifier</h3>
+
+<p>The following class will implement the vanilla Naive Bayes algorithm as seen above. I will try to stick to a <code class="highlighter-rouge">sklearn</code>-like api, with methods such as <code class="highlighter-rouge">fit</code>, <code class="highlighter-rouge">predict</code>, <code class="highlighter-rouge">predict_proba</code> etc. Once again, code is not optimal at all, the goal is to get to something working quickly.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="k">class</span> <span class="nc">NaiveBayesClassifier</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">class_priors</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="o">=</span> <span class="n">class_priors</span>
+
+    <span class="k">def</span> <span class="nf">get_class_log_priors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">normalize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="o">==</span> <span class="s">'equal'</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">NotImplementedError</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">class_log_priors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_log_likelihoods</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fld</span><span class="p">):</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">groups</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="n">fill_value</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">table</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span>
+        <span class="n">sums</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="nb">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">likelihoods</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="nb">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="o">/</span><span class="n">sums</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">log_likelihoods</span> <span class="o">=</span> <span class="n">likelihoods</span><span class="o">.</span><span class="n">applymap</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">log_likelihoods</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_class_log_priors</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">groups</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_likelihoods</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">fld</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_log_likelihoods</span><span class="p">(</span><span class="n">fld</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">series</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">get_approx_log_posterior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">,</span> <span class="n">class_</span><span class="p">):</span>
+        <span class="n">log_posterior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_log_priors</span><span class="p">[</span><span class="n">class_</span><span class="p">]</span>  <span class="c"># prior</span>
+        <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="n">log_posterior</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_likelihoods</span><span class="p">[</span><span class="n">fld</span><span class="p">][</span><span class="n">val</span><span class="p">][</span><span class="n">class_</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">log_posterior</span>
+
+    <span class="k">def</span> <span class="nf">decision_function_series</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
+        <span class="n">approx_log_posteriors</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_approx_log_posterior</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">class_</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">class_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">approx_log_posteriors</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">decision_function_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="nb">apply</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">decision_function_series</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">decision_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+        <span class="s">"""
+        returns the log posteriors
+        """</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function_series</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function_series</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">X</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">predict_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="s">"""
+        returns the (normalized) posterior probability
+
+        normalization is just division by the evidence. doesn't change the argmax.
+        """</span>
+        <span class="n">log_post</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">log_post</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+            <span class="n">post</span> <span class="o">=</span> <span class="n">log_post</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">log_post</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="n">post</span> <span class="o">=</span> <span class="n">log_post</span><span class="o">.</span><span class="n">applymap</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">NotImplementedError</span><span class="p">(</span><span class="s">'type of X is "{}"'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">X</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">normalize</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">post</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+                <span class="n">post</span> <span class="o">/=</span> <span class="n">post</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">post</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+                <span class="n">post</span> <span class="o">=</span> <span class="n">post</span><span class="o">.</span><span class="n">div</span><span class="p">(</span><span class="n">post</span><span class="o">.</span><span class="nb">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">post</span>
+
+    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+        <span class="n">probas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">probas</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">probas</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">probas</span><span class="o">.</span><span class="nb">apply</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">)</span> <span class="o">==</span> <span class="n">preds</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h2 id="3-example-usage">3. Example usage</h2>
+
+<h3 id="31-wine-quality-dataset">3.1 Wine quality dataset</h3>
+
+<p>First example will work with the following <a href="https://archive.ics.uci.edu/ml/datasets/wine+quality">dataset</a>, hosted @ https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/.</p>
+
+<p>We will load it locally, and predict if a given wine is <em>red</em> or <em>white</em>. The reader would need to do minimal prework to get the dataset hosted in the link above in this format.</p>
+
+<p>Let’s take a quick look at the dataset:</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">winedata</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s">'~/metis/github/ct_intel_ml_curriculum/data/Wine_Quality_Data.csv'</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">winedata</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">30</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">winedata</span><span class="o">.</span><span class="n">color</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">normalize</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="n">winedata</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>(6497, 13)
+------------------------------
+white    0.753886
+red      0.246114
+Name: color, dtype: float64
+</code></pre>
+</div>
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>fixed_acidity</th>
+      <th>volatile_acidity</th>
+      <th>citric_acid</th>
+      <th>residual_sugar</th>
+      <th>chlorides</th>
+      <th>free_sulfur_dioxide</th>
+      <th>total_sulfur_dioxide</th>
+      <th>density</th>
+      <th>pH</th>
+      <th>sulphates</th>
+      <th>alcohol</th>
+      <th>quality</th>
+      <th>color</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>2196</th>
+      <td>7.0</td>
+      <td>0.29</td>
+      <td>0.37</td>
+      <td>4.9</td>
+      <td>0.034</td>
+      <td>26.0</td>
+      <td>127.0</td>
+      <td>0.99280</td>
+      <td>3.17</td>
+      <td>0.44</td>
+      <td>10.8</td>
+      <td>6</td>
+      <td>white</td>
+    </tr>
+    <tr>
+      <th>5327</th>
+      <td>6.2</td>
+      <td>0.20</td>
+      <td>0.33</td>
+      <td>5.4</td>
+      <td>0.028</td>
+      <td>21.0</td>
+      <td>75.0</td>
+      <td>0.99012</td>
+      <td>3.36</td>
+      <td>0.41</td>
+      <td>13.5</td>
+      <td>7</td>
+      <td>white</td>
+    </tr>
+    <tr>
+      <th>2911</th>
+      <td>9.6</td>
+      <td>0.25</td>
+      <td>0.54</td>
+      <td>1.3</td>
+      <td>0.040</td>
+      <td>16.0</td>
+      <td>160.0</td>
+      <td>0.99380</td>
+      <td>2.94</td>
+      <td>0.43</td>
+      <td>10.5</td>
+      <td>5</td>
+      <td>white</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Let’s see what this dataset becomes once we transform it with the <code class="highlighter-rouge">NaiveBayesPreprocessor</code></p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">NaiveBayesPreprocessor</span><span class="p">()</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">winedata</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>fixed_acidity</th>
+      <th>volatile_acidity</th>
+      <th>citric_acid</th>
+      <th>residual_sugar</th>
+      <th>chlorides</th>
+      <th>free_sulfur_dioxide</th>
+      <th>total_sulfur_dioxide</th>
+      <th>density</th>
+      <th>pH</th>
+      <th>sulphates</th>
+      <th>alcohol</th>
+      <th>quality</th>
+      <th>color</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>5998</th>
+      <td>7</td>
+      <td>6</td>
+      <td>4</td>
+      <td>18</td>
+      <td>12</td>
+      <td>13</td>
+      <td>14</td>
+      <td>14</td>
+      <td>5</td>
+      <td>17</td>
+      <td>4</td>
+      <td>5</td>
+      <td>white</td>
+    </tr>
+    <tr>
+      <th>3876</th>
+      <td>13</td>
+      <td>0</td>
+      <td>9</td>
+      <td>2</td>
+      <td>3</td>
+      <td>8</td>
+      <td>6</td>
+      <td>6</td>
+      <td>19</td>
+      <td>3</td>
+      <td>12</td>
+      <td>6</td>
+      <td>white</td>
+    </tr>
+    <tr>
+      <th>2823</th>
+      <td>12</td>
+      <td>5</td>
+      <td>15</td>
+      <td>8</td>
+      <td>3</td>
+      <td>10</td>
+      <td>8</td>
+      <td>2</td>
+      <td>13</td>
+      <td>12</td>
+      <td>18</td>
+      <td>7</td>
+      <td>white</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Observe that the last column (which is categorical), is left untouched.</p>
+
+<hr />
+
+<p>Now let’s try the Naive Bayes algorithms on this.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">ShuffleSplit</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">roc_auc_score</span>
+<span class="kn">from</span> <span class="nn">sklearn.naive_bayes</span> <span class="kn">import</span> <span class="n">GaussianNB</span><span class="p">,</span> <span class="n">MultinomialNB</span><span class="p">,</span> <span class="n">BernoulliNB</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">sklearn.pipeline</span> <span class="kn">import</span> <span class="n">Pipeline</span>
+
+<span class="n">pipe</span> <span class="o">=</span> <span class="p">[(</span><span class="s">'preprocessor'</span><span class="p">,</span> <span class="n">NaiveBayesPreprocessor</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s">'nb'</span><span class="p">,</span> <span class="n">NaiveBayesClassifier</span><span class="p">())]</span>
+<span class="n">pipe</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span><span class="n">pipe</span><span class="p">)</span>
+<span class="n">nbs</span> <span class="o">=</span> <span class="p">{</span><span class="s">'_vanilla_'</span><span class="p">:</span> <span class="n">pipe</span><span class="p">,</span>
+       <span class="s">'Multinomial'</span><span class="p">:</span> <span class="n">MultinomialNB</span><span class="p">(),</span>
+       <span class="s">'Bernoulli'</span><span class="p">:</span> <span class="n">BernoulliNB</span><span class="p">(),</span>
+       <span class="s">'Gaussian'</span><span class="p">:</span> <span class="n">GaussianNB</span><span class="p">()}</span>
+
+<span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">winedata</span><span class="p">[</span><span class="n">winedata</span><span class="o">.</span><span class="n">columns</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]],</span> <span class="n">winedata</span><span class="p">[</span><span class="n">winedata</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+
+<span class="n">rs</span> <span class="o">=</span> <span class="n">ShuffleSplit</span><span class="p">(</span><span class="n">test_size</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">n_splits</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">scores</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">train_index</span><span class="p">,</span> <span class="n">test_index</span> <span class="ow">in</span> <span class="n">rs</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">X</span><span class="p">):</span>
+    <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test_index</span><span class="p">]</span>
+    <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test_index</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">est</span> <span class="ow">in</span> <span class="n">nbs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+        <span class="n">scores</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">est</span><span class="o">.</span><span class="n">score</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span><span class="p">))</span>
+
+<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Bernoulli</th>
+      <th>Gaussian</th>
+      <th>Multinomial</th>
+      <th>_vanilla_</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0.764308</td>
+      <td>0.973538</td>
+      <td>0.920615</td>
+      <td>0.987077</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>0.754462</td>
+      <td>0.969231</td>
+      <td>0.913846</td>
+      <td>0.983385</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>0.777231</td>
+      <td>0.971077</td>
+      <td>0.924308</td>
+      <td>0.988308</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>0.777846</td>
+      <td>0.966154</td>
+      <td>0.915077</td>
+      <td>0.990769</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0.780308</td>
+      <td>0.965538</td>
+      <td>0.928615</td>
+      <td>0.989538</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>As you see above, Bernoulli and Multinomial Naive Bayes algorithms aren’t performing well, simply because this dataset isn’t suitable for their use, as explored in <a href="/multinbvsbinomnb/">the previous post</a>. <code class="highlighter-rouge">GaussianNB</code> performs OK, but is beaten by our implementation of NB. To satisfy the curious among us, let’s throw <code class="highlighter-rouge">GradientBoostingClassifier</code> and <code class="highlighter-rouge">RandomForestClassifier</code> (without parameter tuning) at this;</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">sklearn.ensemble</span> <span class="kn">import</span> <span class="n">RandomForestClassifier</span><span class="p">,</span> <span class="n">GradientBoostingClassifier</span>
+
+<span class="n">nbs</span> <span class="o">=</span> <span class="p">{</span><span class="s">'GBT'</span><span class="p">:</span> <span class="n">GradientBoostingClassifier</span><span class="p">(),</span> <span class="s">'RF'</span><span class="p">:</span> <span class="n">RandomForestClassifier</span><span class="p">()}</span>
+<span class="n">scores</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">train_index</span><span class="p">,</span> <span class="n">test_index</span> <span class="ow">in</span> <span class="n">rs</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">X</span><span class="p">):</span>
+    <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test_index</span><span class="p">]</span>
+    <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test_index</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">est</span> <span class="ow">in</span> <span class="n">nbs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+        <span class="n">scores</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">est</span><span class="o">.</span><span class="n">score</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span><span class="p">))</span>
+
+<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>GBT</th>
+      <th>RF</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0.994462</td>
+      <td>0.994462</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>0.993846</td>
+      <td>0.995692</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>0.995077</td>
+      <td>0.993846</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>0.993231</td>
+      <td>0.993231</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0.993231</td>
+      <td>0.993846</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Yeah these powerful algorithms yield better results. Let’s move on to our second example.</p>
+
+<h3 id="32-human-activity-recognition-using-smartphones">3.2 Human Activity Recognition using Smartphones</h3>
+
+<p>Dataset and description can be found @ https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">activity_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s">'~/metis/github/ct_intel_ml_curriculum/data/Human_Activity_Recognition_Using_Smartphones_Data.csv'</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">activity_data</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">30</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">activity_data</span><span class="o">.</span><span class="n">Activity</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">normalize</span><span class="o">=</span><span class="bp">True</span><span class="p">))</span>
+<span class="n">activity_data</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>(10299, 562)
+------------------------------
+LAYING                0.188756
+STANDING              0.185067
+SITTING               0.172541
+WALKING               0.167201
+WALKING_UPSTAIRS      0.149917
+WALKING_DOWNSTAIRS    0.136518
+Name: Activity, dtype: float64
+</code></pre>
+</div>
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>tBodyAcc-mean()-X</th>
+      <th>tBodyAcc-mean()-Y</th>
+      <th>tBodyAcc-mean()-Z</th>
+      <th>tBodyAcc-std()-X</th>
+      <th>tBodyAcc-std()-Y</th>
+      <th>tBodyAcc-std()-Z</th>
+      <th>tBodyAcc-mad()-X</th>
+      <th>tBodyAcc-mad()-Y</th>
+      <th>tBodyAcc-mad()-Z</th>
+      <th>tBodyAcc-max()-X</th>
+      <th>...</th>
+      <th>fBodyBodyGyroJerkMag-skewness()</th>
+      <th>fBodyBodyGyroJerkMag-kurtosis()</th>
+      <th>angle(tBodyAccMean,gravity)</th>
+      <th>angle(tBodyAccJerkMean),gravityMean)</th>
+      <th>angle(tBodyGyroMean,gravityMean)</th>
+      <th>angle(tBodyGyroJerkMean,gravityMean)</th>
+      <th>angle(X,gravityMean)</th>
+      <th>angle(Y,gravityMean)</th>
+      <th>angle(Z,gravityMean)</th>
+      <th>Activity</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>5882</th>
+      <td>0.275918</td>
+      <td>-0.018486</td>
+      <td>-0.100284</td>
+      <td>-0.993155</td>
+      <td>-0.958860</td>
+      <td>-0.962892</td>
+      <td>-0.993935</td>
+      <td>-0.953637</td>
+      <td>-0.960433</td>
+      <td>-0.934424</td>
+      <td>...</td>
+      <td>-0.605982</td>
+      <td>-0.868852</td>
+      <td>0.048834</td>
+      <td>0.094434</td>
+      <td>-0.922991</td>
+      <td>0.715411</td>
+      <td>-0.833794</td>
+      <td>0.212639</td>
+      <td>0.007696</td>
+      <td>STANDING</td>
+    </tr>
+    <tr>
+      <th>1263</th>
+      <td>0.324749</td>
+      <td>-0.012294</td>
+      <td>-0.053416</td>
+      <td>-0.336888</td>
+      <td>0.157011</td>
+      <td>-0.387988</td>
+      <td>-0.409819</td>
+      <td>0.152768</td>
+      <td>-0.426130</td>
+      <td>-0.069544</td>
+      <td>...</td>
+      <td>-0.252935</td>
+      <td>-0.653851</td>
+      <td>-0.294646</td>
+      <td>-0.449551</td>
+      <td>0.601912</td>
+      <td>-0.138953</td>
+      <td>-0.790079</td>
+      <td>0.242435</td>
+      <td>0.002180</td>
+      <td>WALKING</td>
+    </tr>
+    <tr>
+      <th>9466</th>
+      <td>0.287556</td>
+      <td>-0.018570</td>
+      <td>-0.108500</td>
+      <td>-0.984497</td>
+      <td>-0.981637</td>
+      <td>-0.987341</td>
+      <td>-0.985297</td>
+      <td>-0.982858</td>
+      <td>-0.987223</td>
+      <td>-0.927790</td>
+      <td>...</td>
+      <td>-0.656437</td>
+      <td>-0.892907</td>
+      <td>0.034444</td>
+      <td>0.195809</td>
+      <td>0.352398</td>
+      <td>-0.039287</td>
+      <td>0.411160</td>
+      <td>-0.307855</td>
+      <td>-0.682102</td>
+      <td>LAYING</td>
+    </tr>
+  </tbody>
+</table>
+<p>3 rows × 562 columns</p>
+</div>
+
+<p>Because this dataset has negative numbers in it, <code class="highlighter-rouge">MultinomialNB</code> will not work with it. We can add the minimum value to it and make it work, but again, it just doesn’t make a lot of sense to do that.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">pipe</span> <span class="o">=</span> <span class="p">[(</span><span class="s">'preprocessor'</span><span class="p">,</span> <span class="n">NaiveBayesPreprocessor</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s">'nb'</span><span class="p">,</span> <span class="n">NaiveBayesClassifier</span><span class="p">())]</span>
+<span class="n">pipe</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span><span class="n">pipe</span><span class="p">)</span>
+<span class="n">nbs</span> <span class="o">=</span> <span class="p">{</span><span class="s">'_vanilla_'</span><span class="p">:</span> <span class="n">pipe</span><span class="p">,</span>
+       <span class="c"># 'Multinomial': MultinomialNB(),</span>
+       <span class="s">'Bernoulli'</span><span class="p">:</span> <span class="n">BernoulliNB</span><span class="p">(),</span>
+       <span class="s">'Gaussian'</span><span class="p">:</span> <span class="n">GaussianNB</span><span class="p">()}</span>
+
+<span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">activity_data</span><span class="p">[</span><span class="n">activity_data</span><span class="o">.</span><span class="n">columns</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]],</span> <span class="n">activity_data</span><span class="p">[</span><span class="n">activity_data</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+
+<span class="n">rs</span> <span class="o">=</span> <span class="n">ShuffleSplit</span><span class="p">(</span><span class="n">test_size</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">n_splits</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">scores</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">train_index</span><span class="p">,</span> <span class="n">test_index</span> <span class="ow">in</span> <span class="n">rs</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">X</span><span class="p">):</span>
+    <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test_index</span><span class="p">]</span>
+    <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test_index</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">est</span> <span class="ow">in</span> <span class="n">nbs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+        <span class="n">scores</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">est</span><span class="o">.</span><span class="n">score</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span><span class="p">))</span>
+
+<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Bernoulli</th>
+      <th>Gaussian</th>
+      <th>_vanilla_</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0.850485</td>
+      <td>0.725049</td>
+      <td>0.793398</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>0.840388</td>
+      <td>0.699417</td>
+      <td>0.792621</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>0.846214</td>
+      <td>0.716893</td>
+      <td>0.764660</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>0.852039</td>
+      <td>0.776311</td>
+      <td>0.801165</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0.853592</td>
+      <td>0.739806</td>
+      <td>0.801942</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>This time, <code class="highlighter-rouge">BernoulliNB</code> does well. This is because it binarizes the dataset prior to fitting the Bernoulli Naive Bayes, and the threshold it uses to binarize is 0. Incidentally, this works well with predicting the activity. In the prior example, this had almost no added value since everything was nonnegative.</p>
+
+<p>At this point, one could do some parameter tuning, play with the possible bin value etc. In any case, this dataset is not a great dataset for the Naive Bayes type algorithms, but I wanted to see how this implementation does in such an example.</p>
+
+<hr />
+
+<p>In the next post, I will explore a weighted version of this implementation of Naive Bayes, and use it as a weak learner in a boosting scheme.</p>
+
+      </section>
+    </div>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+        ga('create', 'UA-106417291-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>

@@ -137,3 +137,5 @@ a { color: #63c0f5; text-shadow: 0 0 5px rgba(104, 182, 255, 0.5); }
 div.highlighter-rouge pre { background-color: #151515; color: #2ECC40; }
 
 div.language-python pre { border-left-color: #FFDC00; border-left-style: solid; border-left-width: 1px; color: #d0d0d0; background: #000000; }
+
+.container { width: 90%; max-width: 1000px; margin: 0 auto; }

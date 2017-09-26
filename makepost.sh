@@ -1,6 +1,6 @@
 #!/bin/bash
 
-abspath="/metis/github/taylanbil.github.io/_posts"
+abspath="/home/taylanbil/taylanbil.github.io/_posts"
 ipynbfn=`basename $1`
 mdfn=$abspath/`date +%Y-%m-%d`-`echo $ipynbfn | sed s/ipynb$/md/`
 
