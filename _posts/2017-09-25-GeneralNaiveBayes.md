@@ -244,7 +244,7 @@ Before we end this section, notice that the algorithm thinks there's 0 chance th
 
 ## 2. Implementation
 
-### 2.a Preprocessing
+### 2.a. Preprocessing
 
 You may have noticed that in our toy dataset, every attribute was categorical. There were no continuous numerical, nor ordinal fields. Also, unlike `sklearn`'s NB algorithms, we did not make any assumptions about the incoming training dataset. Columns were (thought to be) pairwise independent.
 
@@ -285,10 +285,10 @@ class Discretizer(object):
 
     def fit(self, continuous_series, subsample=None):
         self.mapping = []
+        continuous_series = pd.Series(continuous_series).reset_index(drop=True).dropna()
         if subsample is not None:
             n = len(continuous_series)*subsample if subsample < 1 else subsample
             continuous_series = np.random.choice(continuous_series, n, replace=False)
-        continuous_series = pd.Series(continuous_series).reset_index(drop=1)
         ranked = pd.Series(continuous_series).rank(pct=1, method='average')
         ranked *= self.upperlim - self.bottomlim
         ranked += self.bottomlim
@@ -378,11 +378,7 @@ class NaiveBayesPreprocessor(object):
         vcs = series.value_counts(dropna=False, normalize=True)
         vcs = vcs[vcs >= self.min_freq]
         keep = set(vcs.index)
-        if len(keep) < len(vcs) / 2:
-            transf = lambda r: r if r in keep else self.OTHER
-        else:
-            mask = {fld for fld in vcs.index if fld not in keep}
-            transf = lambda r: self.OTHER if r in mask else r
+        transf = lambda r: r if r in keep else self.OTHER
         return transf
 
     def learn_transf(self, series):
@@ -395,11 +391,13 @@ class NaiveBayesPreprocessor(object):
         """
         Expects pandas series and pandas DataFrame
         """
-        X = X_orig.fillna(self.FILLNA)
         # get dtypes
-        # self.dtypes = defaultdict(set)
-        # for fld, dtype in X.dtypes.iteritems():
-        #     self.dtypes[dtype].add(fld)
+        self.dtypes = defaultdict(set)
+        for fld, dtype in X_orig.dtypes.iteritems():
+            self.dtypes[dtype].add(fld)
+
+        X = X_orig
+        # X = X_orig.fillna(self.FILLNA)
         # get transfs
         self.transformations = {
             fld: self.learn_transf(series)
@@ -409,7 +407,8 @@ class NaiveBayesPreprocessor(object):
         """
         Expects pandas series and pandas DataFrame
         """
-        X = X_orig.fillna(self.FILLNA)
+        X = X_orig.copy()
+        # X = X_orig.fillna(self.FILLNA)
         for fld, func in self.transformations.items():
             if isinstance(func, Discretizer):
                 X[fld] = func.transform(X[fld])
@@ -424,7 +423,7 @@ class NaiveBayesPreprocessor(object):
 
 We will see the preprocessor in action. Before that though, now is the time to code up the `NaiveBayesClassifier`.
 
-### 2.b NaiveBayesClassifier
+### 2.b. NaiveBayesClassifier
 
 The following class will implement the vanilla Naive Bayes algorithm as seen above. I will try to stick to a `sklearn`-like api, with methods such as `fit`, `predict`, `predict_proba` etc. Once again, code is not optimal at all, the goal is to get to something working quickly.
 
@@ -445,12 +444,12 @@ class NaiveBayesClassifier(object):
         self.class_log_priors = self.class_priors.map(np.log)
 
     def get_log_likelihoods(self, fld):
-        table = self.groups[fld].value_counts().unstack(fill_value=0)
+        table = self.groups[fld].value_counts(dropna=False).unstack(fill_value=0)
         table += self.alpha
         sums = table.sum(axis=1)
         likelihoods = table.apply(lambda r: r/sums, axis=0)
         log_likelihoods = likelihoods.applymap(np.log)
-        return log_likelihoods.to_dict()
+        return {k if pd.notnull(k) else None: v for k, v in log_likelihoods.items()}
 
     def fit(self, X, y):
         y = pd.Series(y)
@@ -464,6 +463,16 @@ class NaiveBayesClassifier(object):
     def get_approx_log_posterior(self, series, class_):
         log_posterior = self.class_log_priors[class_]  # prior
         for fld, val in series.iteritems():
+            # there are cases where the `val` is not seen before
+            # as in having a `nan` in the scoring dataset,
+            #   but no `nans in the training set
+            # in those cases, we want to not add anything to the log_posterior
+
+            # This is to handle the Nones and np.nans etc.
+            val = val if pd.notnull(val) else None
+
+            if val not in self.log_likelihoods[fld]:
+                continue
             log_posterior += self.log_likelihoods[fld][val][class_]
         return log_posterior
 
@@ -520,7 +529,7 @@ class NaiveBayesClassifier(object):
 
 ## 3. Example usage
 
-### 3.1 Wine quality dataset
+### 3.1. Wine quality dataset
 
 First example will work with the following [dataset](https://archive.ics.uci.edu/ml/datasets/wine+quality), hosted @ https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/.
 
@@ -866,7 +875,7 @@ pd.DataFrame(scores)
 
 Yeah these powerful algorithms yield better results. Let's move on to our second example.
 
-### 3.2 Human Activity Recognition using Smartphones
+### 3.2. Human Activity Recognition using Smartphones
 
 Dataset and description can be found @ https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones
 
