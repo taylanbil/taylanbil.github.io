@@ -4,7 +4,7 @@
     <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/style.css?v=14fb01960fc3e94c5da715752e354da927ff3349">
+    <link rel="stylesheet" href="/assets/css/style.css?v=8bb84a934aa85cb86abd5b2079f04019a5f67b10">
 
   </head>
 
@@ -267,7 +267,7 @@ P(no | o, m, n, w) approximately is 0.0
 
 <h2 id="2-implementation">2. Implementation</h2>
 
-<h3 id="2a-preprocessing">2.a Preprocessing</h3>
+<h3 id="2a-preprocessing">2.a. Preprocessing</h3>
 
 <p>You may have noticed that in our toy dataset, every attribute was categorical. There were no continuous numerical, nor ordinal fields. Also, unlike <code class="highlighter-rouge">sklearn</code>’s NB algorithms, we did not make any assumptions about the incoming training dataset. Columns were (thought to be) pairwise independent.</p>
 
@@ -308,10 +308,10 @@ P(no | o, m, n, w) approximately is 0.0
 
     <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">continuous_series</span><span class="p">,</span> <span class="n">subsample</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">continuous_series</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">subsample</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">*</span><span class="n">subsample</span> <span class="k">if</span> <span class="n">subsample</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">subsample</span>
             <span class="n">continuous_series</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
-        <span class="n">continuous_series</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="n">ranked</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="n">pct</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">'average'</span><span class="p">)</span>
         <span class="n">ranked</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span>
         <span class="n">ranked</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span>
@@ -400,11 +400,7 @@ dtype: int64
         <span class="n">vcs</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">dropna</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
         <span class="n">vcs</span> <span class="o">=</span> <span class="n">vcs</span><span class="p">[</span><span class="n">vcs</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_freq</span><span class="p">]</span>
         <span class="n">keep</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">vcs</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">keep</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">vcs</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">transf</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">keep</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">OTHER</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">mask</span> <span class="o">=</span> <span class="p">{</span><span class="n">fld</span> <span class="k">for</span> <span class="n">fld</span> <span class="ow">in</span> <span class="n">vcs</span><span class="o">.</span><span class="n">index</span> <span class="k">if</span> <span class="n">fld</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">keep</span><span class="p">}</span>
-            <span class="n">transf</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">OTHER</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">mask</span> <span class="k">else</span> <span class="n">r</span>
+        <span class="n">transf</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">keep</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">OTHER</span>
         <span class="k">return</span> <span class="n">transf</span>
 
     <span class="k">def</span> <span class="nf">learn_transf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
@@ -417,11 +413,13 @@ dtype: int64
         <span class="s">"""
         Expects pandas series and pandas DataFrame
         """</span>
-        <span class="n">X</span> <span class="o">=</span> <span class="n">X_orig</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">FILLNA</span><span class="p">)</span>
         <span class="c"># get dtypes</span>
-        <span class="c"># self.dtypes = defaultdict(set)</span>
-        <span class="c"># for fld, dtype in X.dtypes.iteritems():</span>
-        <span class="c">#     self.dtypes[dtype].add(fld)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">X_orig</span><span class="o">.</span><span class="n">dtypes</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fld</span><span class="p">)</span>
+
+        <span class="n">X</span> <span class="o">=</span> <span class="n">X_orig</span>
+        <span class="c"># X = X_orig.fillna(self.FILLNA)</span>
         <span class="c"># get transfs</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">transformations</span> <span class="o">=</span> <span class="p">{</span>
             <span class="n">fld</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">learn_transf</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
@@ -431,7 +429,8 @@ dtype: int64
         <span class="s">"""
         Expects pandas series and pandas DataFrame
         """</span>
-        <span class="n">X</span> <span class="o">=</span> <span class="n">X_orig</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">FILLNA</span><span class="p">)</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">X_orig</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="c"># X = X_orig.fillna(self.FILLNA)</span>
         <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">func</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">transformations</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">Discretizer</span><span class="p">):</span>
                 <span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">])</span>
@@ -447,7 +446,7 @@ dtype: int64
 
 <p>We will see the preprocessor in action. Before that though, now is the time to code up the <code class="highlighter-rouge">NaiveBayesClassifier</code>.</p>
 
-<h3 id="2b-naivebayesclassifier">2.b NaiveBayesClassifier</h3>
+<h3 id="2b-naivebayesclassifier">2.b. NaiveBayesClassifier</h3>
 
 <p>The following class will implement the vanilla Naive Bayes algorithm as seen above. I will try to stick to a <code class="highlighter-rouge">sklearn</code>-like api, with methods such as <code class="highlighter-rouge">fit</code>, <code class="highlighter-rouge">predict</code>, <code class="highlighter-rouge">predict_proba</code> etc. Once again, code is not optimal at all, the goal is to get to something working quickly.</p>
 
@@ -466,12 +465,12 @@ dtype: int64
         <span class="bp">self</span><span class="o">.</span><span class="n">class_log_priors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">get_log_likelihoods</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fld</span><span class="p">):</span>
-        <span class="n">table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">groups</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="n">fill_value</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">groups</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">dropna</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="n">fill_value</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="n">table</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span>
         <span class="n">sums</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="nb">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
         <span class="n">likelihoods</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="nb">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="o">/</span><span class="n">sums</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="n">log_likelihoods</span> <span class="o">=</span> <span class="n">likelihoods</span><span class="o">.</span><span class="n">applymap</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">log_likelihoods</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span> <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">notnull</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">log_likelihoods</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
 
     <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
         <span class="n">y</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
@@ -485,6 +484,16 @@ dtype: int64
     <span class="k">def</span> <span class="nf">get_approx_log_posterior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">,</span> <span class="n">class_</span><span class="p">):</span>
         <span class="n">log_posterior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_log_priors</span><span class="p">[</span><span class="n">class_</span><span class="p">]</span>  <span class="c"># prior</span>
         <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="c"># there are cases where the `val` is not seen before</span>
+            <span class="c"># as in having a `nan` in the scoring dataset,</span>
+            <span class="c">#   but no `nans in the training set</span>
+            <span class="c"># in those cases, we want to not add anything to the log_posterior</span>
+
+            <span class="c"># This is to handle the Nones and np.nans etc.</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">val</span> <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">notnull</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span>
+
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_likelihoods</span><span class="p">[</span><span class="n">fld</span><span class="p">]:</span>
+                <span class="k">continue</span>
             <span class="n">log_posterior</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_likelihoods</span><span class="p">[</span><span class="n">fld</span><span class="p">][</span><span class="n">val</span><span class="p">][</span><span class="n">class_</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">log_posterior</span>
 
@@ -542,7 +551,7 @@ dtype: int64
 
 <h2 id="3-example-usage">3. Example usage</h2>
 
-<h3 id="31-wine-quality-dataset">3.1 Wine quality dataset</h3>
+<h3 id="31-wine-quality-dataset">3.1. Wine quality dataset</h3>
 
 <p>First example will work with the following <a href="https://archive.ics.uci.edu/ml/datasets/wine+quality">dataset</a>, hosted @ https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/.</p>
 
@@ -862,7 +871,7 @@ Name: color, dtype: float64
 
 <p>Yeah these powerful algorithms yield better results. Let’s move on to our second example.</p>
 
-<h3 id="32-human-activity-recognition-using-smartphones">3.2 Human Activity Recognition using Smartphones</h3>
+<h3 id="32-human-activity-recognition-using-smartphones">3.2. Human Activity Recognition using Smartphones</h3>
 
 <p>Dataset and description can be found @ https://archive.ics.uci.edu/ml/datasets/human+activity+recognition+using+smartphones</p>
 

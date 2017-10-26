@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/assets/css/style.css?v=8bb84a934aa85cb86abd5b2079f04019a5f67b10">
+
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <img src="/img/nation.png" style="float: right; width: 20%; margin-right: 1%; margin-bottom: 1%;" border="5"/>
+        <h1>taylanbil.github.io:wq!</h1>
+        <h2>Math, Data, Python, Machine Learning @ Metis</h2>
+
+        <section id="downloads">
+          
+          <a href="http://github.com/taylanbil/taylanbil.github.io" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+          <a href="/" class="btn btn-home"><span></span>Home</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1 id="gradient-boosting-the-naive-bayes-algorithm">Gradient Boosting the Naive Bayes algorithm</h1>
+
+<h2 id="0-intro">0. Intro</h2>
+
+<p>In the <a href="/vanillanb">last post</a>, I have included a general implementation of the Naive Bayes algorithm. This implementation differed from <code class="highlighter-rouge">sklearn</code>’s Naive Bayes algorithms as discussed <a href="/multinbvsbinomnb">here</a>.</p>
+
+<p>It is well known that Naive Bayes does well with text related classification tasks. However, it is not routinely successful in other areas. In this post, I will try to boost the Naive Bayes algorithm in order to end up with a stronger algorithm that does well more often and in general.</p>
+
+<p>I organized this post as follows:</p>
+
+<ul>
+  <li>First part will import the code from a file named <a href="https://github.com/taylanbil/naivebayes/blob/master/nb.py">nb.py</a> and it will show the usage.</li>
+  <li>Second part will try the code on three publicly available datasets that can be found in the UCI public ML dataset archive.</li>
+  <li>Last part will discuss the implementation by diving deeper into the code.</li>
+</ul>
+
+<p>Before we get started, let’s have a quick refresher about the idea behind boosting; very roughly, it is the idea to stack the so called weak-classifiers on top of each other, in such a way that the next one learns from the mistakes of the previous ones combined. In this notebook, our weak-learners are Naive Bayes classifiers. Traditionally though, weak learners are decision-stumps, or in other words very shallow decision trees.</p>
+
+<p>Disclaimer: Just as in the previous posts, the goal is to get to a working implementation, so the code is sub-optimal.<br />
+Let’s dive right into it…</p>
+
+<hr />
+
+<h2 id="1-intro-baby-steps">1. Intro: Baby steps</h2>
+
+<p>Let’s try the boosted NB on the simple, toy “play tennis” dataset. This is the same dataset as in the previous <a href="/vanillanb">NB post</a>.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+
+<span class="c"># # Data is from below. Hardcoding it in order to remove dependency</span>
+<span class="c"># data = pd.read_csv(</span>
+<span class="c">#     'https://raw.githubusercontent.com/petehunt/c4.5-compiler/master/example/tennis.csv',</span>
+<span class="c">#     usecols=['outlook', 'temp', 'humidity', 'wind', 'play']</span>
+<span class="c"># )</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">[</span><span class="s">'Sunny'</span><span class="p">,</span> <span class="s">'Hot'</span><span class="p">,</span> <span class="s">'High'</span><span class="p">,</span> <span class="s">'Weak'</span><span class="p">,</span> <span class="s">'No'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Sunny'</span><span class="p">,</span> <span class="s">'Hot'</span><span class="p">,</span> <span class="s">'High'</span><span class="p">,</span> <span class="s">'Strong'</span><span class="p">,</span> <span class="s">'No'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Overcast'</span><span class="p">,</span> <span class="s">'Hot'</span><span class="p">,</span> <span class="s">'High'</span><span class="p">,</span> <span class="s">'Weak'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Rain'</span><span class="p">,</span> <span class="s">'Mild'</span><span class="p">,</span> <span class="s">'High'</span><span class="p">,</span> <span class="s">'Weak'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Rain'</span><span class="p">,</span> <span class="s">'Cool'</span><span class="p">,</span> <span class="s">'Normal'</span><span class="p">,</span> <span class="s">'Weak'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Rain'</span><span class="p">,</span> <span class="s">'Cool'</span><span class="p">,</span> <span class="s">'Normal'</span><span class="p">,</span> <span class="s">'Strong'</span><span class="p">,</span> <span class="s">'No'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Overcast'</span><span class="p">,</span> <span class="s">'Cool'</span><span class="p">,</span> <span class="s">'Normal'</span><span class="p">,</span> <span class="s">'Strong'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Sunny'</span><span class="p">,</span> <span class="s">'Mild'</span><span class="p">,</span> <span class="s">'High'</span><span class="p">,</span> <span class="s">'Weak'</span><span class="p">,</span> <span class="s">'No'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Sunny'</span><span class="p">,</span> <span class="s">'Cool'</span><span class="p">,</span> <span class="s">'Normal'</span><span class="p">,</span> <span class="s">'Weak'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Rain'</span><span class="p">,</span> <span class="s">'Mild'</span><span class="p">,</span> <span class="s">'Normal'</span><span class="p">,</span> <span class="s">'Weak'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Sunny'</span><span class="p">,</span> <span class="s">'Mild'</span><span class="p">,</span> <span class="s">'Normal'</span><span class="p">,</span> <span class="s">'Strong'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Overcast'</span><span class="p">,</span> <span class="s">'Mild'</span><span class="p">,</span> <span class="s">'High'</span><span class="p">,</span> <span class="s">'Strong'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Overcast'</span><span class="p">,</span> <span class="s">'Hot'</span><span class="p">,</span> <span class="s">'Normal'</span><span class="p">,</span> <span class="s">'Weak'</span><span class="p">,</span> <span class="s">'Yes'</span><span class="p">],</span>
+    <span class="p">[</span><span class="s">'Rain'</span><span class="p">,</span> <span class="s">'Mild'</span><span class="p">,</span> <span class="s">'High'</span><span class="p">,</span> <span class="s">'Strong'</span><span class="p">,</span> <span class="s">'No'</span><span class="p">],</span>
+<span class="p">]</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="s">'Outlook,Temperature,Humidity,Wind,PlayTennis'</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">','</span><span class="p">))</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">PlayTennis</span> <span class="o">==</span> <span class="s">'Yes'</span>
+<span class="n">data</span>
+</code></pre>
+</div>
+
+<div>
+<style>
+    .dataframe thead tr:only-child th {
+        text-align: right;
+    }
+
+    .dataframe thead th {
+        text-align: left;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Outlook</th>
+      <th>Temperature</th>
+      <th>Humidity</th>
+      <th>Wind</th>
+      <th>PlayTennis</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>Sunny</td>
+      <td>Hot</td>
+      <td>High</td>
+      <td>Weak</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>Sunny</td>
+      <td>Hot</td>
+      <td>High</td>
+      <td>Strong</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>Overcast</td>
+      <td>Hot</td>
+      <td>High</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>Rain</td>
+      <td>Mild</td>
+      <td>High</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>Rain</td>
+      <td>Cool</td>
+      <td>Normal</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>Rain</td>
+      <td>Cool</td>
+      <td>Normal</td>
+      <td>Strong</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>Overcast</td>
+      <td>Cool</td>
+      <td>Normal</td>
+      <td>Strong</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>Sunny</td>
+      <td>Mild</td>
+      <td>High</td>
+      <td>Weak</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>Sunny</td>
+      <td>Cool</td>
+      <td>Normal</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>Rain</td>
+      <td>Mild</td>
+      <td>Normal</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>Sunny</td>
+      <td>Mild</td>
+      <td>Normal</td>
+      <td>Strong</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>Overcast</td>
+      <td>Mild</td>
+      <td>High</td>
+      <td>Strong</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>Overcast</td>
+      <td>Hot</td>
+      <td>Normal</td>
+      <td>Weak</td>
+      <td>Yes</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>Rain</td>
+      <td>Mild</td>
+      <td>High</td>
+      <td>Strong</td>
+      <td>No</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>So we have 4 predictor fields, 14 samples and a binary classification problem. Let’s get the boosted NB classifier from <a href="https://github.com/taylanbil/naivebayes/blob/master/nb.py">nb.py</a> and try it out. The class is called <code class="highlighter-rouge">NaiveBayesBoostingClassifier</code>. The api is again very <code class="highlighter-rouge">sklearn</code>-like, with methods such as <code class="highlighter-rouge">fit</code>, <code class="highlighter-rouge">predict</code>, <code class="highlighter-rouge">predict_proba</code>, <code class="highlighter-rouge">decision_function</code> etc. Let’s also compare the boosted NB with the vanilla NB, <code class="highlighter-rouge">NaiveBayesClassifier</code>, which is the same as before.</p>
+
+<p>We will have 2 versions of the boosted NB.</p>
+
+<ol>
+  <li>First one with only 1 iteration, that is, 0 boosting iterations. This case is therefore equivalent to vanilla NB.</li>
+  <li>Second one with 2 iterations. The first vanilla NB iteration, and 1 boosting iteration on top of that.</li>
+</ol>
+
+<p>The goal is to observe the difference in the calculated posterior probabilities. We will also include the <code class="highlighter-rouge">NaiveBayesClassifier</code>, and observe that it produces the same posteriors as the trivial boosting case.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="o">%</span><span class="n">run</span> <span class="n">nb</span><span class="o">.</span><span class="n">py</span>
+
+<span class="n">nb</span> <span class="o">=</span> <span class="n">NaiveBayesClassifier</span><span class="p">()</span>
+<span class="c"># 1 boosting iteration means, no boosting, and this should spit out exactly the same probas.</span>
+<span class="n">fake_boosting</span> <span class="o">=</span> <span class="n">NaiveBayesBoostingClassifier</span><span class="p">(</span><span class="n">n_iter</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  
+<span class="c"># the following is 2 boosting iterations, so the posteriors should differ a bit;</span>
+<span class="n">real_boosting</span> <span class="o">=</span> <span class="n">NaiveBayesBoostingClassifier</span><span class="p">(</span><span class="n">n_iter</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fake_boosting</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+<span class="n">real_boosting</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+<span class="n">nb</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+<span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">nb</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X</span><span class="p">)[</span><span class="mi">1</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s">'vanilla'</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+<span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="s">'vanilla'</span><span class="p">,</span> <span class="s">'boost_fake'</span><span class="p">,</span> <span class="s">'boost_once'</span><span class="p">,</span> <span class="s">'truth'</span><span class="p">]</span>
+<span class="n">out</span><span class="p">[</span><span class="s">'boost_once'</span><span class="p">]</span> <span class="o">=</span> <span class="n">real_boosting</span><span class="o">.</span><span class="n">decision_function</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="s">'boost_fake'</span><span class="p">]</span> <span class="o">=</span> <span class="n">fake_boosting</span><span class="o">.</span><span class="n">decision_function</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+<span class="n">out</span><span class="p">[</span><span class="s">'truth'</span><span class="p">]</span> <span class="o">=</span> <span class="n">y</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="p">[</span><span class="n">cols</span><span class="p">]</span>
+<span class="n">out</span>
+</code></pre>
+</div>
+
+<div>
+<style>
+    .dataframe thead tr:only-child th {
+        text-align: right;
+    }
+
+    .dataframe thead th {
+        text-align: left;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>vanilla</th>
+      <th>boost_fake</th>
+      <th>boost_once</th>
+      <th>truth</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0.312031</td>
+      <td>0.312031</td>
+      <td>0.313928</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>0.162746</td>
+      <td>0.162746</td>
+      <td>0.164083</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>0.751472</td>
+      <td>0.751472</td>
+      <td>0.752014</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>0.573354</td>
+      <td>0.573354</td>
+      <td>0.573302</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0.875858</td>
+      <td>0.875858</td>
+      <td>0.870270</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>0.751472</td>
+      <td>0.751472</td>
+      <td>0.745584</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>0.918955</td>
+      <td>0.918955</td>
+      <td>0.915018</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>0.430499</td>
+      <td>0.430499</td>
+      <td>0.432647</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>0.798736</td>
+      <td>0.798736</td>
+      <td>0.794659</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>0.854638</td>
+      <td>0.854638</td>
+      <td>0.851980</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>0.586325</td>
+      <td>0.586325</td>
+      <td>0.584993</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>0.683522</td>
+      <td>0.683522</td>
+      <td>0.684268</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>0.929719</td>
+      <td>0.929719</td>
+      <td>0.928607</td>
+      <td>True</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>0.365459</td>
+      <td>0.365459</td>
+      <td>0.365355</td>
+      <td>False</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Observe that boosting with 1 iteration, i.e. the trivial, non-boosting, produces the same posterior probability as the vanilla NB. On the other hand, the first non-trivial boosting differs from them a tiny bit. It has been changed according to the gradient of the vanilla NB.</p>
+
+<p>Now let’s apply the boostied NB to some of the publicly available ML datasets. Note that the current version of the boosted NB is <strong>binary classification only</strong>.</p>
+
+<h3 id="1b-framework-for-comparing-the-performance">1.b Framework for comparing the performance</h3>
+
+<p>I’ll start this subsection by importing the necessary tools and defining functions which will make it easy to compare the performance of several ML classification algorithms, including <code class="highlighter-rouge">NaiveBayesClassifier</code> and <code class="highlighter-rouge">NaiveBayesBoostingClassifier</code>. The other ones are:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">GaussianNB</code></li>
+  <li><code class="highlighter-rouge">AdaBoost</code></li>
+  <li><code class="highlighter-rouge">GradientBoostingClassifier</code> from <code class="highlighter-rouge">sklearn</code>, which is gradient boosted decision trees.</li>
+</ul>
+
+<p>The classifiers listed above are included with their default choice of parameters, without any parameter tuning, as that is beyond the scope of this post. On the other hand, I included two versions of the boosted NB, one with 10 boosting iterations and one with 20. This will help us have a feeling about how the classifier progresses with more iterations.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">ShuffleSplit</span>
+<span class="kn">from</span> <span class="nn">sklearn.naive_bayes</span> <span class="kn">import</span> <span class="n">GaussianNB</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">sklearn.pipeline</span> <span class="kn">import</span> <span class="n">Pipeline</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">sklearn.ensemble</span> <span class="kn">import</span> <span class="n">AdaBoostClassifier</span><span class="p">,</span> <span class="n">GradientBoostingClassifier</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">roc_auc_score</span>
+<span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">Imputer</span>
+
+
+<span class="k">def</span> <span class="nf">make_pipe</span><span class="p">(</span><span class="n">est</span><span class="p">):</span>
+    <span class="n">pipe</span> <span class="o">=</span> <span class="p">[(</span><span class="s">'imputer'</span><span class="p">,</span> <span class="n">Imputer</span><span class="p">()),</span>
+            <span class="p">(</span><span class="s">'estimator'</span><span class="p">,</span> <span class="n">est</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">Pipeline</span><span class="p">(</span><span class="n">pipe</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">make_boost_pipe</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="n">pipe_boost</span> <span class="o">=</span> <span class="p">[(</span><span class="s">'preprocessor'</span><span class="p">,</span> <span class="n">NaiveBayesPreprocessor</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">)),</span>
+                  <span class="p">(</span><span class="s">'nbb'</span><span class="p">,</span> <span class="n">NaiveBayesBoostingClassifier</span><span class="p">(</span><span class="n">n_iter</span><span class="o">=</span><span class="n">n</span><span class="p">))]</span>
+    <span class="n">pipe_boost</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span><span class="n">pipe_boost</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pipe_boost</span>
+
+<span class="o">%</span><span class="n">run</span> <span class="n">nb</span><span class="o">.</span><span class="n">py</span>
+<span class="n">pipe</span> <span class="o">=</span> <span class="p">[(</span><span class="s">'preprocessor'</span><span class="p">,</span> <span class="n">NaiveBayesPreprocessor</span><span class="p">(</span><span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s">'nb'</span><span class="p">,</span> <span class="n">NaiveBayesClassifier</span><span class="p">())]</span>
+<span class="n">pipe</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span><span class="n">pipe</span><span class="p">)</span>
+<span class="n">algos</span> <span class="o">=</span> <span class="p">{</span><span class="s">'nbayes'</span><span class="p">:</span> <span class="n">pipe</span><span class="p">,</span>
+        <span class="s">'gnb'</span><span class="p">:</span> <span class="n">make_pipe</span><span class="p">(</span><span class="n">GaussianNB</span><span class="p">()),</span>
+        <span class="s">'ada'</span><span class="p">:</span> <span class="n">make_pipe</span><span class="p">(</span><span class="n">AdaBoostClassifier</span><span class="p">()),</span>
+        <span class="s">'gbt'</span><span class="p">:</span> <span class="n">make_pipe</span><span class="p">(</span><span class="n">GradientBoostingClassifier</span><span class="p">())}</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">]:</span>
+    <span class="n">algos</span><span class="p">[</span><span class="s">'nbayes+gboost {}'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span> <span class="o">=</span> <span class="n">make_boost_pipe</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+    <span class="n">rs</span> <span class="o">=</span> <span class="n">ShuffleSplit</span><span class="p">(</span><span class="n">test_size</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">n_splits</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">accuracies</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">rocs</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">times</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">train_index</span><span class="p">,</span> <span class="n">test_index</span> <span class="ow">in</span> <span class="n">rs</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">X</span><span class="p">):</span>
+        <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">X</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test_index</span><span class="p">]</span>
+        <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">train_index</span><span class="p">],</span> <span class="n">y</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">test_index</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">est</span> <span class="ow">in</span> <span class="n">algos</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">then</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+            <span class="n">est</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+            <span class="n">accuracies</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">est</span><span class="o">.</span><span class="n">score</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span><span class="p">))</span>
+            <span class="c"># now the roc auc</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">est</span><span class="o">.</span><span class="n">steps</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">GaussianNB</span><span class="p">):</span>
+                <span class="n">ys</span> <span class="o">=</span> <span class="n">est</span><span class="o">.</span><span class="n">decision_function</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ys</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">ys</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="n">ys</span> <span class="o">=</span> <span class="n">ys</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ys</span> <span class="o">=</span> <span class="n">est</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_test</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">rocs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">roc_auc_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">ys</span><span class="p">))</span>
+            <span class="n">times</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">then</span>
+    <span class="n">accuracies</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">accuracies</span><span class="p">)</span>
+    <span class="n">rocs</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rocs</span><span class="p">)</span>
+    <span class="n">times</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+    <span class="n">accuracies</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">'accuracy'</span>
+    <span class="n">rocs</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">'roc-auc'</span>
+    <span class="n">times</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">'time'</span>
+    <span class="k">return</span> <span class="n">accuracies</span><span class="p">,</span> <span class="n">rocs</span><span class="p">,</span> <span class="n">times</span>
+
+
+<span class="k">def</span> <span class="nf">go</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+    <span class="n">accuracies</span><span class="p">,</span> <span class="n">rocs</span><span class="p">,</span> <span class="n">times</span> <span class="o">=</span> <span class="n">compare</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">accuracies</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">80</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">rocs</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">80</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">times</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
+</code></pre>
+</div>
+
+<p>Quick look at the last line of the <code class="highlighter-rouge">compare</code> function tells us that it returns the accuracies, roc-auc’s and the times it took for all the algorithms it tried. The variable <code class="highlighter-rouge">algos</code> contains the algorithms we are trying. Now we are in a good position to apply these algorithms to various binary classification problems and see what happens.</p>
+
+<hr />
+
+<h2 id="2-trying-it-out">2. Trying it out</h2>
+
+<p>In this section, the code cells contain urls which refer to the datasets being used. For more information about them, you can follow those links.</p>
+
+<h3 id="21-spamdata">2.1 <a href="https://archive.ics.uci.edu/ml/machine-learning-databases/spambase/spambase.DOCUMENTATION">Spamdata</a></h3>
+
+<p>The first choice is the spam/non-spam binary classification for emails. A problem that is well known to be a good use case for classical Naive Bayes approach, although that sort of implies the dataset has <em>bag-of-words</em> type features and the NB algorithm in question is either <code class="highlighter-rouge">MultinomialNB</code> or <code class="highlighter-rouge">BernoulliNB</code>.</p>
+
+<p>Let’s load the dataset, create our <code class="highlighter-rouge">X</code> and <code class="highlighter-rouge">y</code>, and take a quick glance at them.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">spamdata</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span>
+    <span class="s">'https://archive.ics.uci.edu/ml/machine-learning-databases/spambase/spambase.data'</span><span class="p">,</span>
+    <span class="n">header</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">spamdata</span><span class="p">[</span><span class="n">spamdata</span><span class="o">.</span><span class="n">columns</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="s">'col{}'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">spamdata</span><span class="p">})</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">spamdata</span><span class="p">[</span><span class="n">spamdata</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+<span class="k">print</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">80</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">info</span><span class="p">())</span>
+<span class="n">X</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>0    2788
+1    1813
+Name: 57, dtype: int64
+--------------------------------------------------------------------------------
+&lt;class 'pandas.core.frame.DataFrame'&gt;
+RangeIndex: 4601 entries, 0 to 4600
+Data columns (total 57 columns):
+col0     4601 non-null float64
+col1     4601 non-null float64
+col2     4601 non-null float64
+col3     4601 non-null float64
+col4     4601 non-null float64
+col5     4601 non-null float64
+col6     4601 non-null float64
+col7     4601 non-null float64
+col8     4601 non-null float64
+col9     4601 non-null float64
+col10    4601 non-null float64
+col11    4601 non-null float64
+col12    4601 non-null float64
+col13    4601 non-null float64
+col14    4601 non-null float64
+col15    4601 non-null float64
+col16    4601 non-null float64
+col17    4601 non-null float64
+col18    4601 non-null float64
+col19    4601 non-null float64
+col20    4601 non-null float64
+col21    4601 non-null float64
+col22    4601 non-null float64
+col23    4601 non-null float64
+col24    4601 non-null float64
+col25    4601 non-null float64
+col26    4601 non-null float64
+col27    4601 non-null float64
+col28    4601 non-null float64
+col29    4601 non-null float64
+col30    4601 non-null float64
+col31    4601 non-null float64
+col32    4601 non-null float64
+col33    4601 non-null float64
+col34    4601 non-null float64
+col35    4601 non-null float64
+col36    4601 non-null float64
+col37    4601 non-null float64
+col38    4601 non-null float64
+col39    4601 non-null float64
+col40    4601 non-null float64
+col41    4601 non-null float64
+col42    4601 non-null float64
+col43    4601 non-null float64
+col44    4601 non-null float64
+col45    4601 non-null float64
+col46    4601 non-null float64
+col47    4601 non-null float64
+col48    4601 non-null float64
+col49    4601 non-null float64
+col50    4601 non-null float64
+col51    4601 non-null float64
+col52    4601 non-null float64
+col53    4601 non-null float64
+col54    4601 non-null float64
+col55    4601 non-null int64
+col56    4601 non-null int64
+dtypes: float64(55), int64(2)
+memory usage: 2.0 MB
+None
+</code></pre>
+</div>
+
+<div>
+<style>
+    .dataframe thead tr:only-child th {
+        text-align: right;
+    }
+
+    .dataframe thead th {
+        text-align: left;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>col0</th>
+      <th>col1</th>
+      <th>col2</th>
+      <th>col3</th>
+      <th>col4</th>
+      <th>col5</th>
+      <th>col6</th>
+      <th>col7</th>
+      <th>col8</th>
+      <th>col9</th>
+      <th>...</th>
+      <th>col47</th>
+      <th>col48</th>
+      <th>col49</th>
+      <th>col50</th>
+      <th>col51</th>
+      <th>col52</th>
+      <th>col53</th>
+      <th>col54</th>
+      <th>col55</th>
+      <th>col56</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>1783</th>
+      <td>0.33</td>
+      <td>0.84</td>
+      <td>0.67</td>
+      <td>0.0</td>
+      <td>0.67</td>
+      <td>0.33</td>
+      <td>0.67</td>
+      <td>0.0</td>
+      <td>0.33</td>
+      <td>0.0</td>
+      <td>...</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.183</td>
+      <td>0.000</td>
+      <td>0.156</td>
+      <td>0.104</td>
+      <td>0.026</td>
+      <td>6.500</td>
+      <td>525</td>
+      <td>858</td>
+    </tr>
+    <tr>
+      <th>3351</th>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.0</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.0</td>
+      <td>0.00</td>
+      <td>0.0</td>
+      <td>...</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.000</td>
+      <td>0.751</td>
+      <td>0.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+      <td>1.428</td>
+      <td>4</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <th>2601</th>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.0</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.0</td>
+      <td>0.00</td>
+      <td>0.0</td>
+      <td>...</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+      <td>1.769</td>
+      <td>8</td>
+      <td>23</td>
+    </tr>
+  </tbody>
+</table>
+<p>3 rows × 57 columns</p>
+</div>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">go</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>               ada       gbt       gnb    nbayes  nbayes+gboost 10  nbayes+gboost 20
+accuracy                                                                            
+0         0.936577  0.946134  0.810599  0.893136          0.919201          0.932233
+1         0.934839  0.947003  0.820156  0.894005          0.933970          0.943527
+2         0.942659  0.947871  0.817550  0.905300          0.931364          0.942659
+--------------------------------------------------------------------------------
+              ada       gbt       gnb    nbayes  nbayes+gboost 10  nbayes+gboost 20
+roc-auc                                                                            
+0        0.975604  0.983871  0.939048  0.565013          0.975606          0.978455
+1        0.977105  0.987682  0.942894  0.545387          0.980848          0.984901
+2        0.979726  0.988510  0.956382  0.527922          0.981500          0.984293
+--------------------------------------------------------------------------------
+time
+ada                00:00:00.250069
+gbt                00:00:00.527525
+gnb                00:00:00.006865
+nbayes             00:00:04.577352
+nbayes+gboost 10   00:00:28.502304
+nbayes+gboost 20   00:00:59.384143
+</code></pre>
+</div>
+
+<p><strong>Evaluation</strong>:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">GaussianNB</code> produced around 94% roc auc, which is not a bad number.</li>
+  <li>Vanilla NB produced a 56% roc auc. That somehow translated to a higher accuracy, which suggests a threshold problem with the <code class="highlighter-rouge">GaussianNB</code>.</li>
+  <li>Classical boosting algorithms got to 98% roc auc.</li>
+  <li>Boosted NB with 10 iterations improved significantly over Vanilla NB, and it achieved 98% roc auc. 20 iterations improved slighlty over 10 iterations, which is not a bad sign.</li>
+</ul>
+
+<p>So in this case, boosted NB did very comparatively with AdaBoost and Gradient Boosted DTs. Moreover, we observed a good improvement provided by the boosting iterations over the vanilla NB algorithm. We hope this to be a recurring theme.</p>
+
+<hr />
+
+<h3 id="22-bankruptcy-data">2.2 <a href="http://archive.ics.uci.edu/ml/datasets/Polish+companies+bankruptcy+data">Bankruptcy Data</a></h3>
+
+<p>Next up I would like to switch to a more business oriented problem. Here we have the data of Polish companies and the ones that went bankrupt. Let’s again load the data and take a quick look. Afterwards, let’s apply the algorithms and compare.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="c"># Polish bankruptcy data from</span>
+<span class="c"># http://archive.ics.uci.edu/ml/datasets/Polish+companies+bankruptcy+data</span>
+
+<span class="kn">from</span> <span class="nn">scipy.io</span> <span class="kn">import</span> <span class="n">arff</span>
+
+
+<span class="k">def</span> <span class="nf">load_arff</span><span class="p">(</span><span class="n">fn</span><span class="p">):</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">arff</span><span class="o">.</span><span class="n">loadarff</span><span class="p">(</span><span class="n">fn</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">applymap</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span> <span class="k">if</span> <span class="n">r</span> <span class="o">!=</span> <span class="s">'?'</span> <span class="k">else</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="c"># X.dropna(how='any', inplace=True)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">'class'</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="p">(</span><span class="n">y</span> <span class="o">==</span> <span class="n">b</span><span class="s">'1'</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span>
+
+
+<span class="n">fns</span> <span class="o">=</span> <span class="err">!</span><span class="n">ls</span> <span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">taylanbil</span><span class="o">/</span><span class="n">Downloads</span><span class="o">/*</span><span class="n">year</span><span class="o">.</span><span class="n">arff</span>
+<span class="n">_</span> <span class="o">=</span> <span class="p">[</span><span class="n">load_arff</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span> <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">fns</span><span class="p">]</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">X</span> <span class="k">for</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">_</span><span class="p">])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">y</span> <span class="k">for</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">_</span><span class="p">])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="k">del</span> <span class="n">_</span>
+<span class="k">print</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">80</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">info</span><span class="p">())</span>
+<span class="n">X</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>0    41314
+1     2091
+Name: class, dtype: int64
+--------------------------------------------------------------------------------
+&lt;class 'pandas.core.frame.DataFrame'&gt;
+RangeIndex: 43405 entries, 0 to 43404
+Data columns (total 64 columns):
+Attr1     43397 non-null float64
+Attr2     43397 non-null float64
+Attr3     43397 non-null float64
+Attr4     43271 non-null float64
+Attr5     43316 non-null float64
+Attr6     43397 non-null float64
+Attr7     43397 non-null float64
+Attr8     43311 non-null float64
+Attr9     43396 non-null float64
+Attr10    43397 non-null float64
+Attr11    43361 non-null float64
+Attr12    43271 non-null float64
+Attr13    43278 non-null float64
+Attr14    43397 non-null float64
+Attr15    43369 non-null float64
+Attr16    43310 non-null float64
+Attr17    43311 non-null float64
+Attr18    43397 non-null float64
+Attr19    43277 non-null float64
+Attr20    43278 non-null float64
+Attr21    37551 non-null float64
+Attr22    43397 non-null float64
+Attr23    43278 non-null float64
+Attr24    42483 non-null float64
+Attr25    43397 non-null float64
+Attr26    43310 non-null float64
+Attr27    40641 non-null float64
+Attr28    42593 non-null float64
+Attr29    43397 non-null float64
+Attr30    43278 non-null float64
+Attr31    43278 non-null float64
+Attr32    43037 non-null float64
+Attr33    43271 non-null float64
+Attr34    43311 non-null float64
+Attr35    43397 non-null float64
+Attr36    43397 non-null float64
+Attr37    24421 non-null float64
+Attr38    43397 non-null float64
+Attr39    43278 non-null float64
+Attr40    43271 non-null float64
+Attr41    42651 non-null float64
+Attr42    43278 non-null float64
+Attr43    43278 non-null float64
+Attr44    43278 non-null float64
+Attr45    41258 non-null float64
+Attr46    43270 non-null float64
+Attr47    43108 non-null float64
+Attr48    43396 non-null float64
+Attr49    43278 non-null float64
+Attr50    43311 non-null float64
+Attr51    43397 non-null float64
+Attr52    43104 non-null float64
+Attr53    42593 non-null float64
+Attr54    42593 non-null float64
+Attr55    43404 non-null float64
+Attr56    43278 non-null float64
+Attr57    43398 non-null float64
+Attr58    43321 non-null float64
+Attr59    43398 non-null float64
+Attr60    41253 non-null float64
+Attr61    43303 non-null float64
+Attr62    43278 non-null float64
+Attr63    43271 non-null float64
+Attr64    42593 non-null float64
+dtypes: float64(64)
+memory usage: 21.2 MB
+None
+</code></pre>
+</div>
+
+<div>
+<style>
+    .dataframe thead tr:only-child th {
+        text-align: right;
+    }
+
+    .dataframe thead th {
+        text-align: left;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Attr1</th>
+      <th>Attr2</th>
+      <th>Attr3</th>
+      <th>Attr4</th>
+      <th>Attr5</th>
+      <th>Attr6</th>
+      <th>Attr7</th>
+      <th>Attr8</th>
+      <th>Attr9</th>
+      <th>Attr10</th>
+      <th>...</th>
+      <th>Attr55</th>
+      <th>Attr56</th>
+      <th>Attr57</th>
+      <th>Attr58</th>
+      <th>Attr59</th>
+      <th>Attr60</th>
+      <th>Attr61</th>
+      <th>Attr62</th>
+      <th>Attr63</th>
+      <th>Attr64</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>28436</th>
+      <td>0.027486</td>
+      <td>0.28592</td>
+      <td>-0.070966</td>
+      <td>0.64665</td>
+      <td>-68.132</td>
+      <td>0.048296</td>
+      <td>0.033511</td>
+      <td>2.22740</td>
+      <td>1.06920</td>
+      <td>0.63686</td>
+      <td>...</td>
+      <td>-3472.5</td>
+      <td>0.064732</td>
+      <td>0.043158</td>
+      <td>0.93527</td>
+      <td>0.1336</td>
+      <td>15.0500</td>
+      <td>14.057</td>
+      <td>90.126</td>
+      <td>4.0499</td>
+      <td>0.93478</td>
+    </tr>
+    <tr>
+      <th>31905</th>
+      <td>0.148640</td>
+      <td>0.18727</td>
+      <td>0.594540</td>
+      <td>10.38300</td>
+      <td>353.680</td>
+      <td>0.000000</td>
+      <td>0.183680</td>
+      <td>4.33980</td>
+      <td>0.74969</td>
+      <td>0.81273</td>
+      <td>...</td>
+      <td>3424.4</td>
+      <td>0.232490</td>
+      <td>0.182890</td>
+      <td>0.75900</td>
+      <td>0.0000</td>
+      <td>19.1100</td>
+      <td>34.970</td>
+      <td>30.850</td>
+      <td>11.8320</td>
+      <td>2.19150</td>
+    </tr>
+    <tr>
+      <th>11506</th>
+      <td>0.001574</td>
+      <td>0.50511</td>
+      <td>0.084972</td>
+      <td>1.17170</td>
+      <td>-32.080</td>
+      <td>0.000000</td>
+      <td>0.002360</td>
+      <td>0.97975</td>
+      <td>2.94260</td>
+      <td>0.49489</td>
+      <td>...</td>
+      <td>108.0</td>
+      <td>-0.004278</td>
+      <td>0.003180</td>
+      <td>0.99921</td>
+      <td>0.0000</td>
+      <td>8.6374</td>
+      <td>12.808</td>
+      <td>61.386</td>
+      <td>5.9459</td>
+      <td>7.00370</td>
+    </tr>
+  </tbody>
+</table>
+<p>3 rows × 64 columns</p>
+</div>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">go</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>               ada       gbt       gnb    nbayes  nbayes+gboost 10  nbayes+gboost 20
+accuracy                                                                            
+0         0.954386  0.970052  0.078787  0.727055          0.906008          0.932547
+1         0.957704  0.971250  0.065334  0.730280          0.911076          0.943421
+2         0.956782  0.971618  0.067822  0.731755          0.902046          0.946461
+--------------------------------------------------------------------------------
+              ada       gbt       gnb    nbayes  nbayes+gboost 10  nbayes+gboost 20
+roc-auc                                                                            
+0        0.879490  0.912178  0.497303  0.733217          0.760798          0.794332
+1        0.890159  0.921132  0.503383  0.776884          0.786405          0.830294
+2        0.888399  0.925583  0.495057  0.758146          0.777545          0.813152
+--------------------------------------------------------------------------------
+time
+ada                00:00:12.529434
+gbt                00:00:15.847193
+gnb                00:00:00.074148
+nbayes             00:00:52.060308
+nbayes+gboost 10   00:04:27.274454
+nbayes+gboost 20   00:08:38.005423
+</code></pre>
+</div>
+
+<p><strong>Evaluation</strong>:</p>
+
+<ul>
+  <li>Once again, <code class="highlighter-rouge">GaussianNB</code> performed the worst among the bunch. Not only that, but this time it provided no predictivity, with 50% roc auc.</li>
+  <li>Classical boosting algorithms did well, with <code class="highlighter-rouge">AdaBoost</code> around 89% and <code class="highlighter-rouge">GradientBoostingClassifier</code> around 92% roc auc.</li>
+  <li>Vanilla NB had around 75% roc auc.</li>
+  <li>Boosted NB with 10 iterations -&gt; 78% roc auc. Not a ground breaking improvement but an improvement nonetheless.</li>
+  <li>20 iterations got us to 81% roc. This suggests a consistent increase in performance.</li>
+</ul>
+
+<p>In this example, we have another case of boosting iterations improving the performance. As known from classical boosting algorithms, number of iterations is a hyperparameter one needs to tune for a given problem. It does not seem that we have hit a ceiling of performance here. However, tuning those parameters is not the goal of this post, so we’ll skip that discussion.</p>
+
+<h3 id="23-credit-card-defaults-data">2.3 <a href="https://archive.ics.uci.edu/ml/datasets/default+of+credit+card+clients">Credit Card Defaults Data</a></h3>
+
+<p>Continuing with the finance theme, third dataset is the credit card default dataset from consumers in Taiwan. Let’s dive in.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="s">'https://archive.ics.uci.edu/ml/datasets/default+of+credit+card+clients'</span>
+<span class="n">bankruptcy</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_excel</span><span class="p">(</span><span class="s">'/home/taylanbil/Downloads/default of credit card clients.xls'</span><span class="p">,</span> <span class="n">skiprows</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">bankruptcy</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">'default payment next month'</span><span class="p">)</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">bankruptcy</span>
+<span class="k">print</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'-'</span><span class="o">*</span><span class="mi">80</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">info</span><span class="p">())</span>
+<span class="n">X</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>0    23364
+1     6636
+Name: default payment next month, dtype: int64
+--------------------------------------------------------------------------------
+&lt;class 'pandas.core.frame.DataFrame'&gt;
+RangeIndex: 30000 entries, 0 to 29999
+Data columns (total 24 columns):
+ID           30000 non-null int64
+LIMIT_BAL    30000 non-null int64
+SEX          30000 non-null int64
+EDUCATION    30000 non-null int64
+MARRIAGE     30000 non-null int64
+AGE          30000 non-null int64
+PAY_0        30000 non-null int64
+PAY_2        30000 non-null int64
+PAY_3        30000 non-null int64
+PAY_4        30000 non-null int64
+PAY_5        30000 non-null int64
+PAY_6        30000 non-null int64
+BILL_AMT1    30000 non-null int64
+BILL_AMT2    30000 non-null int64
+BILL_AMT3    30000 non-null int64
+BILL_AMT4    30000 non-null int64
+BILL_AMT5    30000 non-null int64
+BILL_AMT6    30000 non-null int64
+PAY_AMT1     30000 non-null int64
+PAY_AMT2     30000 non-null int64
+PAY_AMT3     30000 non-null int64
+PAY_AMT4     30000 non-null int64
+PAY_AMT5     30000 non-null int64
+PAY_AMT6     30000 non-null int64
+dtypes: int64(24)
+memory usage: 5.5 MB
+None
+</code></pre>
+</div>
+
+<div>
+<style>
+    .dataframe thead tr:only-child th {
+        text-align: right;
+    }
+
+    .dataframe thead th {
+        text-align: left;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>ID</th>
+      <th>LIMIT_BAL</th>
+      <th>SEX</th>
+      <th>EDUCATION</th>
+      <th>MARRIAGE</th>
+      <th>AGE</th>
+      <th>PAY_0</th>
+      <th>PAY_2</th>
+      <th>PAY_3</th>
+      <th>PAY_4</th>
+      <th>...</th>
+      <th>BILL_AMT3</th>
+      <th>BILL_AMT4</th>
+      <th>BILL_AMT5</th>
+      <th>BILL_AMT6</th>
+      <th>PAY_AMT1</th>
+      <th>PAY_AMT2</th>
+      <th>PAY_AMT3</th>
+      <th>PAY_AMT4</th>
+      <th>PAY_AMT5</th>
+      <th>PAY_AMT6</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>22959</th>
+      <td>22960</td>
+      <td>210000</td>
+      <td>2</td>
+      <td>1</td>
+      <td>2</td>
+      <td>30</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>...</td>
+      <td>89173</td>
+      <td>91489</td>
+      <td>93463</td>
+      <td>95021</td>
+      <td>4600</td>
+      <td>3789</td>
+      <td>3811</td>
+      <td>3465</td>
+      <td>3186</td>
+      <td>4389</td>
+    </tr>
+    <tr>
+      <th>24953</th>
+      <td>24954</td>
+      <td>60000</td>
+      <td>1</td>
+      <td>2</td>
+      <td>2</td>
+      <td>30</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>...</td>
+      <td>6733</td>
+      <td>7662</td>
+      <td>8529</td>
+      <td>9884</td>
+      <td>1500</td>
+      <td>1300</td>
+      <td>1200</td>
+      <td>1000</td>
+      <td>1500</td>
+      <td>800</td>
+    </tr>
+    <tr>
+      <th>10352</th>
+      <td>10353</td>
+      <td>360000</td>
+      <td>1</td>
+      <td>3</td>
+      <td>1</td>
+      <td>58</td>
+      <td>-1</td>
+      <td>-1</td>
+      <td>-1</td>
+      <td>-1</td>
+      <td>...</td>
+      <td>1090</td>
+      <td>780</td>
+      <td>390</td>
+      <td>388</td>
+      <td>554</td>
+      <td>1096</td>
+      <td>780</td>
+      <td>0</td>
+      <td>388</td>
+      <td>887</td>
+    </tr>
+  </tbody>
+</table>
+<p>3 rows × 24 columns</p>
+</div>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">go</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>               ada       gbt       gnb    nbayes  nbayes+gboost 10  nbayes+gboost 20
+accuracy                                                                            
+0         0.813600  0.815467  0.410800  0.757333          0.788133          0.791867
+1         0.818933  0.823200  0.365067  0.758667          0.790133          0.795333
+2         0.814667  0.821867  0.371867  0.760933          0.793467          0.799333
+--------------------------------------------------------------------------------
+              ada       gbt       gnb    nbayes  nbayes+gboost 10  nbayes+gboost 20
+roc-auc                                                                            
+0        0.762167  0.770514  0.658582  0.483075          0.745817          0.739989
+1        0.779408  0.783143  0.677352  0.479125          0.762096          0.754629
+2        0.779661  0.787814  0.659249  0.483573          0.758837          0.750321
+--------------------------------------------------------------------------------
+time
+ada                00:00:01.701464
+gbt                00:00:02.663667
+gnb                00:00:00.023219
+nbayes             00:00:13.379899
+nbayes+gboost 10   00:02:21.470685
+nbayes+gboost 20   00:04:33.042267
+</code></pre>
+</div>
+
+<p><strong>Evaluation</strong>:</p>
+
+<ul>
+  <li>Similar as above, <code class="highlighter-rouge">AdaBoost</code> and <code class="highlighter-rouge">GBT</code> are the best ones.</li>
+  <li><code class="highlighter-rouge">GaussianNB</code> did ok.</li>
+  <li>Vanilla NB had atrocious performance. 48% roc auc.</li>
+  <li>Boosted NB with 10 iterations had 76% roc auc. Pretty good performance.</li>
+  <li>20 iterations had slightly worse performance; 75% roc auc.</li>
+</ul>
+
+<p>This case illustrates the importance of boosting very well. With 1 iteration, NB has absolutely no predictive value. However, once we start boosting, we get to a pretty good performance, competing with the classical boosting algorithms! That is a striking difference. 20 iterations being worse than 10 suggests that the optimal value is less than 20 (it could be less than 10 too, we did not check that).</p>
+
+<hr />
+
+<p>All in all, we saw the improvement offered by boosting the basic NB algorithm. Although it did not beat the boosted DTs in these examples, there may be cases where it does. There seems to be value in adding this algorithm to one’s ML toolkit.</p>
+
+<p>Now let’s get down to the nitty-gritty and see how this all works.</p>
+
+<h2 id="3-code">3. Code</h2>
+
+<p>The code can be found <a href="https://github.com/taylanbil/naivebayes/blob/master/nb.py">here</a>. I will paste bits and pieces from that file and try to explain how it comes together.</p>
+
+<h3 id="31-review-of-vanilla-nb">3.1. Review of vanilla NB</h3>
+
+<p>First of all, the boosted NB builds on the classes introduced in the <a href="/vanillanb">previous post</a>. For convenience, here’s the code from that discussion.</p>
+
+<p>As a quick reminder; the code contains three major parts;</p>
+
+<ol>
+  <li><code class="highlighter-rouge">NaiveBayesClassifier</code>, which implements the NB algorithm.</li>
+  <li><code class="highlighter-rouge">NaiveBayesPreprocessor</code>, which fits and/or transforms a dataset so that the output is suitable for applying the <code class="highlighter-rouge">NaiveBayesClassifier</code>.</li>
+  <li><code class="highlighter-rouge">Discretizer</code>, which takes a continuous <code class="highlighter-rouge">pandas</code> Series and bins it. It also remembers the bins for future use (typically @ scoring time). This is employed by the <code class="highlighter-rouge">NaiveBayesPreprocessor</code>.</li>
+</ol>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">itemgetter</span>
+<span class="kn">from</span> <span class="nn">bisect</span> <span class="kn">import</span> <span class="n">bisect_right</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+
+
+<span class="k">class</span> <span class="nc">Discretizer</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">upperlim</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">bottomlim</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span> <span class="o">=</span> <span class="n">mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_lims</span><span class="p">(</span><span class="n">upperlim</span><span class="p">,</span> <span class="n">bottomlim</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">cutoffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">set_lims</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">upperlim</span><span class="p">,</span> <span class="n">bottomlim</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span> <span class="o">=</span> <span class="n">bottomlim</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span> <span class="o">=</span> <span class="n">upperlim</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">)))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span>
+
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">continuous_series</span><span class="p">,</span> <span class="n">subsample</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">continuous_series</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">subsample</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">*</span><span class="n">subsample</span> <span class="k">if</span> <span class="n">subsample</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">subsample</span>
+            <span class="n">continuous_series</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">continuous_series</span><span class="p">)</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="n">pct</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s">'average'</span><span class="p">)</span>
+        <span class="n">ranked</span> <span class="o">*=</span> <span class="bp">self</span><span class="o">.</span><span class="n">upperlim</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span>
+        <span class="n">ranked</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bottomlim</span>
+        <span class="n">ranked</span> <span class="o">=</span> <span class="n">ranked</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="nb">round</span><span class="p">)</span>
+        <span class="n">nvals</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">ranked</span><span class="p">))</span>  <span class="c"># sorted in case numpy changes</span>
+        <span class="k">for</span> <span class="n">nval</span> <span class="ow">in</span> <span class="n">nvals</span><span class="p">:</span>
+            <span class="n">cond</span> <span class="o">=</span> <span class="n">ranked</span> <span class="o">==</span> <span class="n">nval</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">continuous_series</span><span class="p">[</span><span class="n">cond</span><span class="p">]</span><span class="o">.</span><span class="nb">min</span><span class="p">(),</span> <span class="nb">int</span><span class="p">(</span><span class="n">nval</span><span class="p">)))</span>
+
+    <span class="k">def</span> <span class="nf">transform_single</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">NotImplementedError</span><span class="p">(</span><span class="s">'Haven</span><span class="se">\'</span><span class="s">t been fitted yet'</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="n">bisect_right</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cutoffs</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mapping</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform_single</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">vals</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transform_single</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vals</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">NaiveBayesPreprocessor</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="s">"""
+    Don't pass in Nans. fill with keyword.
+    """</span>
+
+    <span class="n">OTHER</span> <span class="o">=</span> <span class="s">'____OTHER____'</span>
+    <span class="n">FILLNA</span> <span class="o">=</span> <span class="s">'____NA____'</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">min_freq</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha</span>  <span class="c"># Laplace smoothing</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_freq</span> <span class="o">=</span> <span class="n">min_freq</span>  <span class="c"># drop values occuring less frequently than this</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bins</span> <span class="o">=</span> <span class="n">bins</span>  <span class="c"># number of bins for continuous fields</span>
+
+    <span class="k">def</span> <span class="nf">learn_continuous_transf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
+        <span class="n">D</span> <span class="o">=</span> <span class="n">Discretizer</span><span class="p">(</span><span class="n">upperlim</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bins</span><span class="p">)</span>
+        <span class="n">D</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">D</span>
+
+    <span class="k">def</span> <span class="nf">learn_discrete_transf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
+        <span class="n">vcs</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">dropna</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="n">vcs</span> <span class="o">=</span> <span class="n">vcs</span><span class="p">[</span><span class="n">vcs</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">min_freq</span><span class="p">]</span>
+        <span class="n">keep</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">vcs</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+        <span class="n">transf</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">keep</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">OTHER</span>
+        <span class="k">return</span> <span class="n">transf</span>
+
+    <span class="k">def</span> <span class="nf">learn_transf</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">series</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learn_continuous_transf</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">learn_discrete_transf</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X_orig</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="s">"""
+        Expects pandas series and pandas DataFrame
+        """</span>
+        <span class="c"># get dtypes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">X_orig</span><span class="o">.</span><span class="n">dtypes</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fld</span><span class="p">)</span>
+
+        <span class="n">X</span> <span class="o">=</span> <span class="n">X_orig</span>
+        <span class="c"># X = X_orig.fillna(self.FILLNA)</span>
+        <span class="c"># get transfs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transformations</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">fld</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">learn_transf</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">series</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()}</span>
+
+    <span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X_orig</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="s">"""
+        Expects pandas series and pandas DataFrame
+        """</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">X_orig</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="c"># X = X_orig.fillna(self.FILLNA)</span>
+        <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">func</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">transformations</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">Discretizer</span><span class="p">):</span>
+                <span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">X</span>
+
+    <span class="k">def</span> <span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">NaiveBayesClassifier</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">class_priors</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="o">=</span> <span class="n">class_priors</span>
+
+    <span class="k">def</span> <span class="nf">get_class_log_priors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">normalize</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="o">==</span> <span class="s">'equal'</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">NotImplementedError</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">class_log_priors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_log_likelihoods</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fld</span><span class="p">):</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">groups</span><span class="p">[</span><span class="n">fld</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">(</span><span class="n">dropna</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="n">fill_value</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">table</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span>
+        <span class="n">sums</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="nb">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">likelihoods</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="nb">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="o">/</span><span class="n">sums</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">log_likelihoods</span> <span class="o">=</span> <span class="n">likelihoods</span><span class="o">.</span><span class="n">applymap</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span> <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">notnull</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">log_likelihoods</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_class_log_priors</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">groups</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_likelihoods</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">fld</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_log_likelihoods</span><span class="p">(</span><span class="n">fld</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">series</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">get_approx_log_posterior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">,</span> <span class="n">class_</span><span class="p">):</span>
+        <span class="n">log_posterior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_log_priors</span><span class="p">[</span><span class="n">class_</span><span class="p">]</span>  <span class="c"># prior</span>
+        <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">series</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="c"># there are cases where the `val` is not seen before</span>
+            <span class="c"># as in having a `nan` in the scoring dataset,</span>
+            <span class="c">#   but no `nans in the training set</span>
+            <span class="c"># in those cases, we want to not add anything to the log_posterior</span>
+
+            <span class="c"># This is to handle the Nones and np.nans etc.</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">val</span> <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">notnull</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span>
+
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_likelihoods</span><span class="p">[</span><span class="n">fld</span><span class="p">]:</span>
+                <span class="k">continue</span>
+            <span class="n">log_posterior</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_likelihoods</span><span class="p">[</span><span class="n">fld</span><span class="p">][</span><span class="n">val</span><span class="p">][</span><span class="n">class_</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">log_posterior</span>
+
+    <span class="k">def</span> <span class="nf">decision_function_series</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">):</span>
+        <span class="n">approx_log_posteriors</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_approx_log_posterior</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">class_</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">class_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">approx_log_posteriors</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">decision_function_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="nb">apply</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">decision_function_series</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">decision_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+        <span class="s">"""
+        returns the log posteriors
+        """</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function_series</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function_series</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">X</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">predict_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="s">"""
+        returns the (normalized) posterior probability
+
+        normalization is just division by the evidence. doesn't change the argmax.
+        """</span>
+        <span class="n">log_post</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">log_post</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+            <span class="n">post</span> <span class="o">=</span> <span class="n">log_post</span><span class="o">.</span><span class="nb">map</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">log_post</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="n">post</span> <span class="o">=</span> <span class="n">log_post</span><span class="o">.</span><span class="n">applymap</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">NotImplementedError</span><span class="p">(</span><span class="s">'type of X is "{}"'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">X</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">normalize</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">post</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+                <span class="n">post</span> <span class="o">/=</span> <span class="n">post</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">post</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+                <span class="n">post</span> <span class="o">=</span> <span class="n">post</span><span class="o">.</span><span class="n">div</span><span class="p">(</span><span class="n">post</span><span class="o">.</span><span class="nb">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">post</span>
+
+    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+        <span class="n">probas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">probas</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">probas</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">probas</span><span class="o">.</span><span class="nb">apply</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">)</span> <span class="o">==</span> <span class="n">preds</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h3 id="32-quick-review-of-boosting">3.2. Quick Review of boosting</h3>
+
+<p>The idea of boosting consists of these following major parts;</p>
+
+<ol>
+  <li>A weak (or “base”) learner which fits to the dataset.</li>
+  <li>A loss function which evaluates the predictions and the truth values.</li>
+  <li>A new weak learner that is trained on the new “truth values”, which are adjusted so that the past mistakes are weighed more heavily. The idea is to try to correct the mistakes iteratively.</li>
+  <li>A method (usually line search) that will define how to bring the new weak learner that is freshly trained into the mix of the past weak learners.</li>
+</ol>
+
+<p>To implement this with the NB classifier as the weak learner, we first need a new version of our NB classifier, that can be trained with arbitrary values as the truth set. But the NB algotihm is naturally a classifier. The classical boosting algorithms as <code class="highlighter-rouge">AdaBoost</code> and <code class="highlighter-rouge">GBT</code>’s use “regression trees”, which are decision trees that output continuous values, as their weak learners. Modifying NB to do that seems a bit awkward. Therefore, I chose to not touch the natural “classifier” aspect of NB. Instead, I coded a version of the NB classifier with sample weights. That is, the samples that are gotten wrong by the past weak learners are weighed heavily in the next iteration.</p>
+
+<p>Our loss function will be the same as the <code class="highlighter-rouge">BinomialDeviance</code> loss function that <code class="highlighter-rouge">GBT</code>s use in <code class="highlighter-rouge">sklearn</code>.</p>
+
+<h3 id="33-code-for-the-boosted-nb">3.3. Code for the Boosted NB</h3>
+
+<p>First let’s introduce the weak learner, i.e. the <code class="highlighter-rouge">WeightedNaiveBayesClassifier</code>. This inherits from the <code class="highlighter-rouge">NaiveBayesClassifier</code>, and modifies the key methods to accomodate sample weights. The code differs in the way that it stores the log likelihoods and the class priors. The scoring / predicting methods are the same as they retrieve data from the log likelihoods and class priors only.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="k">class</span> <span class="nc">WeightedNaiveBayesClassifier</span><span class="p">(</span><span class="n">NaiveBayesClassifier</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="nf">get_class_log_priors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">class_</span><span class="p">:</span> <span class="p">((</span><span class="n">y</span> <span class="o">==</span> <span class="n">class_</span><span class="p">)</span><span class="o">*</span><span class="n">weights</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">class_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">class_log_priors</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">class_</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">class_</span><span class="p">,</span> <span class="n">prior</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">class_priors</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+    <span class="k">def</span> <span class="nf">get_log_likelihood</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">class_</span><span class="p">,</span> <span class="n">series</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">vals</span><span class="p">,</span> <span class="n">weights</span><span class="p">):</span>
+        <span class="c"># indices of `series` and `y` and `weights` must be the same</span>
+        <span class="c"># XXX: what to do with alpha? should we smooth it out somehow?</span>
+        <span class="n">cond</span> <span class="o">=</span> <span class="n">y</span> <span class="o">==</span> <span class="n">class_</span>
+        <span class="n">num</span> <span class="o">=</span> <span class="p">((</span><span class="n">series</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">cond</span><span class="p">]</span> <span class="o">==</span> <span class="n">val</span><span class="p">)</span> <span class="o">*</span> <span class="n">weights</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">cond</span><span class="p">])</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span>
+        <span class="n">denom</span> <span class="o">=</span> <span class="p">(</span><span class="n">weights</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">cond</span><span class="p">])</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">num</span><span class="o">/</span><span class="n">denom</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_log_likelihoods</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">series</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="p">):</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+        <span class="n">y_</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="n">series_</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="n">weights_</span> <span class="o">=</span> <span class="n">weights</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+
+        <span class="n">log_likelihoods</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">val</span><span class="p">:</span> <span class="p">{</span><span class="n">class_</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_log_likelihood</span><span class="p">(</span><span class="n">y_</span><span class="p">,</span> <span class="n">class_</span><span class="p">,</span> <span class="n">series_</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">vals</span><span class="p">,</span> <span class="n">weights_</span><span class="p">)</span>
+                  <span class="k">for</span> <span class="n">class_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">classes_</span><span class="p">}</span>
+            <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">vals</span><span class="p">}</span>
+        <span class="k">return</span> <span class="n">log_likelihoods</span>
+
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">weights</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">WeightedNaiveBayesClassifier</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">weights</span> <span class="o">*=</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span> <span class="o">/</span> <span class="n">weights</span><span class="o">.</span><span class="nb">sum</span><span class="p">()</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_class_log_priors</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_likelihoods</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">fld</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_log_likelihoods</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">fld</span><span class="p">,</span> <span class="n">series</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()</span>
+        <span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Now we’re ready for the final piece, the <code class="highlighter-rouge">NaiveBayesBoostingClassifier</code>. Here’s the code.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="k">class</span> <span class="nc">NaiveBayesBoostingClassifier</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="s">"""
+    For now, this is Binary classification only.
+    `y` needs to consist of 0 or 1
+    """</span>
+
+    <span class="n">TRUTHFLD</span> <span class="o">=</span> <span class="s">'__'</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">n_iter</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.1</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_iter</span> <span class="o">=</span> <span class="n">n_iter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span> <span class="o">=</span> <span class="n">learning_rate</span>
+
+    <span class="k">def</span> <span class="nf">loss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">vectorize</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="s">"""
+        This uses the `BinomialDeviance` loss function.
+        That means, this implementation of NaiveBayesBoostingClassifier
+            is for binary classification only. Change this function
+            to implement multiclass classification
+
+        Compute the deviance (= 2 * negative log-likelihood).
+
+        note that `pred` here is the actual predicted posterior proba.
+        `pred` in sklearn is log odds
+        """</span>
+        <span class="n">logodds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">pred</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">pred</span><span class="p">))</span>
+        <span class="c"># logaddexp(0, v) == log(1.0 + exp(v))</span>
+        <span class="n">ans</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.0</span> <span class="o">*</span> <span class="p">((</span><span class="n">y</span> <span class="o">*</span> <span class="n">logodds</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">logaddexp</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">logodds</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">ans</span> <span class="k">if</span> <span class="n">vectorize</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">ans</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">adjust_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">weights</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="n">y</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+            <span class="c"># return -- this errors out bc defers to non weighted nb above</span>
+
+        <span class="n">pred</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predicted_posteriors</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">vectorize</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">line_search_helper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_preds</span><span class="p">,</span> <span class="n">step</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">predicted_posteriors</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">new_preds</span>
+        <span class="n">ans</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predicted_posteriors</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">step</span><span class="p">)</span>
+        <span class="n">ans</span> <span class="o">+=</span> <span class="n">step</span> <span class="o">*</span> <span class="n">new_preds</span>
+        <span class="k">return</span> <span class="n">ans</span>
+
+    <span class="k">def</span> <span class="nf">line_search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_preds</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="c"># TODO: This can be done using scipy.optimize.line_search</span>
+        <span class="c"># but for now, we'll just try 10 values and pick the best one</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_search_results</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">line_search_results</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">return</span> <span class="mi">1</span>
+        <span class="n">steps_to_try</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span>
+            <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">learning_rate</span><span class="o">/</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
+            <span class="n">steps_to_try</span><span class="p">,</span>
+            <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">loss</span><span class="p">(</span>
+                <span class="n">y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_search_helper</span><span class="p">(</span><span class="n">new_preds</span><span class="p">,</span> <span class="n">s</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">line_search_results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">step</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">step</span>
+
+    <span class="k">def</span> <span class="nf">_predict_proba_1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">est</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+        <span class="c"># XXX: another place where we assume binary clf</span>
+        <span class="c"># TODO: need a robust way to get 1</span>
+        <span class="k">return</span> <span class="n">est</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">predicted_posteriors</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">line_search_results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_iter</span><span class="p">):</span>
+            <span class="n">weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">adjust_weights</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+            <span class="n">nbc</span> <span class="o">=</span> <span class="n">WeightedNaiveBayesClassifier</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span>
+            <span class="n">nbc</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+            <span class="n">new_preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predict_proba_1</span><span class="p">(</span><span class="n">nbc</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">nbc</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">line_search</span><span class="p">(</span><span class="n">new_preds</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">predicted_posteriors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_search_helper</span><span class="p">(</span>
+                <span class="n">new_preds</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_search_results</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">decision_function_df</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">staged</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="n">stage_posteriors</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_predict_proba_1</span><span class="p">(</span><span class="n">est</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span> <span class="k">for</span> <span class="n">est</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">stages</span><span class="p">]</span>
+        <span class="n">posteriors</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="n">staged</span><span class="p">:</span>
+            <span class="n">staged_posteriors</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">sp</span><span class="p">,</span> <span class="n">step</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">stage_posteriors</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">line_search_results</span><span class="p">)):</span>
+            <span class="n">posteriors</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">step</span><span class="p">)</span><span class="o">*</span><span class="n">posteriors</span> <span class="o">+</span> <span class="n">step</span><span class="o">*</span><span class="n">sp</span>
+            <span class="k">if</span> <span class="n">staged</span><span class="p">:</span>
+                <span class="n">staged_posteriors</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">posteriors</span>
+        <span class="k">return</span> <span class="n">posteriors</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">staged</span> <span class="k">else</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">staged_posteriors</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">decision_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function_df</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">thr</span><span class="o">=</span><span class="mf">0.5</span><span class="p">):</span>
+        <span class="n">probas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_function</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">probas</span> <span class="o">&gt;=</span> <span class="n">thr</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="c"># # draft for multiclass approach below</span>
+        <span class="c"># if isinstance(probas, pd.Series):</span>
+        <span class="c">#     return np.argmax(probas)</span>
+        <span class="c"># return probas.apply(np.argmax, axis=1)</span>
+
+    <span class="k">def</span> <span class="nf">score</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+        <span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">y</span><span class="p">)</span> <span class="o">==</span> <span class="n">preds</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Perhaps the most interesting part of this code is the <code class="highlighter-rouge">fit</code> method. Here we see the for loop which builds the NB classifiers for each boosting iteration. The <code class="highlighter-rouge">adjust_weights</code> method computes the new sample weights according to the loss function, which then is fed to the <code class="highlighter-rouge">WeightedNaiveBayesClassifier</code> for the next weak learner.</p>
+
+<p>The way the loss function and the <code class="highlighter-rouge">adjust_weights</code> method are coded make them restricted to the binary classification case. One would need to replace binomial deviance loss with multinomial deviance loss and modify the weights adjustment accordingly to accomodate the multiclass case.</p>
+
+<p>Then comes the line search part. Although it is possible to do an actual line search here, I opted out for a simple “try 10 things and pick the best one” method. Not the best approach for sure.</p>
+
+<p>Feel free to contact me (@taylanbil in twitter, linkedin, facebook, etc) for any questions/comments.</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code>
+</code></pre>
+</div>
+
+      </section>
+    </div>
+
+    
+      <script type="text/javascript">
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+        ga('create', 'UA-106417291-1', 'auto');
+        ga('send', 'pageview');
+      </script>
+    
+  </body>
+</html>
