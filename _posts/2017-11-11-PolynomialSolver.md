@@ -13,7 +13,7 @@ published: true
 
 ## 0. Introduction
 
-This post is based on [this](https://github.com/fchollet/keras/blob/master/examples/addition_rnn.py) wonderful example of a neural network that learns to add to given numbers. In the keras example, the inputs are numbers, however the network sees them as encoded characters. So, in effect, the network has no awareness of the inputs, specifically of their ordinal nature. And magically, it still learns to add the two input sequences (of numbers, which it sees as characters), and spits out the correct answer more often than not.
+This post is based on [this](https://github.com/fchollet/keras/blob/master/examples/addition_rnn.py) wonderful example of a neural network that learns to add two given numbers. In the keras example, the inputs are numbers, however the network sees them as encoded characters. So, in effect, the network has no awareness of the inputs, specifically of their ordinal nature. And magically, it still learns to add the two input sequences (of numbers, which it sees as characters), and spits out the correct answer more often than not.
 
 Here, my goal is to build on this (non-useful but cool) idea of formulating a math problem as a machine learning problem, and code up a Neural Network which learns to solve polynomials.
 
