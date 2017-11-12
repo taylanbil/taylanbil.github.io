@@ -4,7 +4,7 @@
     <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/style.css?v=c79777c9883c7c4dc555a82d8fc04342c0f5bb24">
+    <link rel="stylesheet" href="/assets/css/style.css?v=4b22f26881322de5612358c676cbcf141a467f65">
 
   </head>
 
@@ -34,7 +34,7 @@
 
 <h2 id="0-introduction">0. Introduction</h2>
 
-<p>This post is based on <a href="https://github.com/fchollet/keras/blob/master/examples/addition_rnn.py">this</a> wonderful example of a neural network that learns to add to given numbers. In the keras example, the inputs are numbers, however the network sees them as encoded characters. So, in effect, the network has no awareness of the inputs, specifically of their ordinal nature. And magically, it still learns to add the two input sequences (of numbers, which it sees as characters), and spits out the correct answer more often than not.</p>
+<p>This post is based on <a href="https://github.com/fchollet/keras/blob/master/examples/addition_rnn.py">this</a> wonderful example of a neural network that learns to add two given numbers. In the keras example, the inputs are numbers, however the network sees them as encoded characters. So, in effect, the network has no awareness of the inputs, specifically of their ordinal nature. And magically, it still learns to add the two input sequences (of numbers, which it sees as characters), and spits out the correct answer more often than not.</p>
 
 <p>Here, my goal is to build on this (non-useful but cool) idea of formulating a math problem as a machine learning problem, and code up a Neural Network which learns to solve polynomials.</p>
 
@@ -524,7 +524,7 @@ off by 1: 1 times
 </code></pre>
 </div>
 
-<p>Fantastic. Only a few mistakes out of 25k predictions. To be fair though that was a pretty easy thing to figure out. In fact, it would be interesting to see why those mistakes have occured. Let’s check out how the network fares compared to random prediction. I’m going to have to modify the compare function a little bit since the number of roots vary from case to case.</p>
+<p>Fantastic. Only a few mistakes out of 25k predictions [NOTE: this used to be 13 mistakes in a prior run of the notebook lol :)]. To be fair though that was a pretty easy thing to figure out. In fact, it would be interesting to see why those mistakes have occured. Let’s check out how the network fares compared to random prediction. I’m going to have to modify the compare function a little bit since the number of roots vary from case to case.</p>
 
 <div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="n">index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">true_root_count</span> <span class="o">==</span> <span class="n">pred_root_count</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 <span class="n">index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
