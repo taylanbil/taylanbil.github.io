@@ -513,7 +513,7 @@ for key, val in Counter(true_root_count - pred_root_count).items():
     off by 1: 1 times
 
 
-Fantastic. Only a few mistakes out of 25k predictions. To be fair though that was a pretty easy thing to figure out. In fact, it would be interesting to see why those mistakes have occured. Let's check out how the network fares compared to random prediction. I'm going to have to modify the compare function a little bit since the number of roots vary from case to case.
+Fantastic. Only a few mistakes out of 25k predictions [NOTE: this used to be 13 mistakes in a prior run of the notebook lol :)]. To be fair though that was a pretty easy thing to figure out. In fact, it would be interesting to see why those mistakes have occured. Let's check out how the network fares compared to random prediction. I'm going to have to modify the compare function a little bit since the number of roots vary from case to case.
 
 
 ```python
